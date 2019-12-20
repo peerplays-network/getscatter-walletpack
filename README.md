@@ -1,3 +1,6 @@
+
+[![Gitter](https://badges.gitter.im/GetScatter-Peerplays-Integration/community.svg)](https://gitter.im/GetScatter-Peerplays-Integration/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=body_badge)
+
 # WalletPack
 
 This is a wallet building SDK which takes care of all of the heavy lifting for creating blockchain wallets.
