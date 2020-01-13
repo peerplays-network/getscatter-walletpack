@@ -124,7 +124,7 @@ export default class PPY extends Plugin {
 	}
 
 	defaultDecimals(){ return 4; }
-	defaultToken(){ return new Token(Blockchains.EOSIO, 'eosio.token', 'EOS', 'EOS', this.defaultDecimals(), MAINNET_CHAIN_ID) }
+	defaultToken(){ return new Token(Blockchains.PPY, 'ppy', 'PPY', 'PPY', this.defaultDecimals(), MAINNET_CHAIN_ID) }
 	actionParticipants(payload){ return payload.transaction.participants }
 
 
