@@ -11,15 +11,16 @@ import TokenService from                "@walletpack/core/services/utility/Token
 import EventService from                "@walletpack/core/services/utility/EventService";
 import SigningService from              "@walletpack/core/services/secure/SigningService";
 import ecc from 'eosjs-ecc';
-import {PrivateKey, key} from "peerplaysjs-lib";
-
+import {PrivateKey, PublicKey, ChainValidation, key, ChainStore} from "peerplaysjs-lib";
 //TO-DO: Replace with Peerplays explorer.
 const EXPLORER = {
-	"name":"Bloks",
-	"account":"https://bloks.io/account/{x}",
-	"transaction":"https://bloks.io/transaction/{x}",
-	"block":"https://bloks.io/block/{x}"
+	"name":"PeerplaysBlockchain",
+	"account":"https://peerplaysblockchain.info/account/{x}",
+	"transaction":"https://peerplaysblockchain.info/explorer/transactions/{x}",
+	"block":"https://peerplaysblockchain.info/block/{x}"
 };
+
+const MAINNET_CHAIN_ID = 1;
 
 export default class PPY extends Plugin {
 
@@ -27,13 +28,18 @@ export default class PPY extends Plugin {
 		 super('ppy', PluginTypes.BLOCKCHAIN_SUPPORT) 
 	}
 
-	bip(){ return `44'/195'/0'/0/`}
+	bip(){ return `44'/194'/0'/0/`}
 	bustCache(){ cachedInstances = {}; }
 	defaultExplorer(){ return EXPLORER; }
 	accountFormatter(account){ return `${account.publicKey}` }
-	returnableAccount(account){ return { address:account.publicKey, blockchain:Blockchains.TRX }}
-
-	contractPlaceholder(){ return '0x.....'; }
+	returnableAccount(account){
+		 return { name:account.name, address:account.publicKey, blockchain:Blockchains.PPY }
+		}
+	
+	// TO-DO:
+	contractPlaceholder(){
+		 return ''; 
+		}
 
 	checkNetwork(network){
 		return Promise.race([
@@ -44,7 +50,7 @@ export default class PPY extends Plugin {
 
 	getEndorsedNetwork(){
 		//TO-DO: Replace with Peerplays mainnet.
-		return new Network('EOS Mainnet', 'https', 'nodes.get-scatter.com', 443, Blockchains.EOSIO, MAINNET_CHAIN_ID)
+		return new Network('Peerplays Mainnet', 'https', 'seed01.eifos.org', 7777, Blockchains.PPY, MAINNET_CHAIN_ID)
 	}
 
 	isEndorsedNetwork(network){
@@ -60,18 +66,20 @@ export default class PPY extends Plugin {
 	hasAccountActions(){ return false; }
 
 	accountsAreImported(){ return true; }
-	
-	isValidRecipient(name){ return /(^[a-z1-5.]{1}([a-z1-5.]{0,10}[a-z1-5])?$)/g.test(name); }
+
+	isValidRecipient(name){
+		 return ChainValidation.is_account_name(name); 
+		}
 	privateToPublic(privateKey, prefix = null){ return ecc.PrivateKey(privateKey).toPublic().toString(prefix ? prefix : 'PPY'); }
 	validPrivateKey(privateKey){ return privateKey.length >= 50 && ecc.isValidPrivate(privateKey); }
 	validPublicKey(publicKey, prefix = null){
 		try {
-			return ecc.PublicKey.fromStringOrThrow(publicKey, prefix ? prefix : Blockchains.EOSIO.toUpperCase());
+			return PublicKey.fromStringOrThrow(publicKey, prefix ? prefix : 'PPY');
 		} catch(e){
 			return false;
 		}
 	}
-	bufferToHexPrivate(buffer){ // Private Key
+	bufferToHexPrivate(buffer){
 		return ecc.PrivateKey.fromBuffer(Buffer.from(buffer)).toString()
 	}
 	hexPrivateToBuffer(privateKey){
@@ -81,6 +89,7 @@ export default class PPY extends Plugin {
 	hasUntouchableTokens(){ return false; }
 
 	async balanceFor(account, token){
+		// TO-DO: Update for Peerplays
 		const balances = await Promise.race([
 			new Promise(resolve => setTimeout(() => resolve([]), 10000)),
 			getTableRows(account.network(), {
@@ -97,6 +106,7 @@ export default class PPY extends Plugin {
 	}
 
 	async balancesFor(account, tokens, fallback = false){
+		// TO-DO: Update for Peerplays
 		if(!fallback && this.isEndorsedNetwork(account.network())){
 			const balances = await EosTokenAccountAPI.getAllTokens(account);
 			if(!balances) return this.balanceFor(account, tokens, true);
