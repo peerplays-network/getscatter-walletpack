@@ -165,6 +165,7 @@ export default class PPY extends Plugin {
 	 */
 	async balancesFor(account, tokens, fallback = false){
 		let fullAccount = await this.getFullAccount(account.name);
+		let tokenArray = [];
 		
 		tokens.map((token) => {
 			const t = token.clone();
@@ -177,9 +178,10 @@ export default class PPY extends Plugin {
 			}
 			const balance = new BigNumber(unformattedBalance)/(Math.pow(10, this.defaultDecimals()));
 			t.amount = balance;
-			return t;
+			tokenArray.push(t);
 		})
 
+		return tokenArray;
 
 	}
 
