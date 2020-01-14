@@ -138,13 +138,13 @@ export default class PPY extends Plugin {
 
 	//TO-DO: Format into token class
 	async balanceFor(account, token){
-		let account = await this.getFullAccount(account.name);
+		let fullAccount = await this.getFullAccount(account.name);
 		let balance;
 
 		if (token.symbol.toUpperCase() === 'PPY' ) {
-			balance = account.get('balances').get(0).get('balance')
+			balance = fullAccount.get('balances').get(0).get('balance')
 		} else {
-			balance = account.get('balances').get(1).get('balance')
+			balance = fullAccount.get('balances').get(1).get('balance')
 		}
 		const clone = token.clone();
 		clone.amount = balance; // format this
