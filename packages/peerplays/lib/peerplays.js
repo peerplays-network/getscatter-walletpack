@@ -12,6 +12,8 @@ import EventService from                "@walletpack/core/services/utility/Event
 import SigningService from              "@walletpack/core/services/secure/SigningService";
 import ecc from 'eosjs-ecc';
 import Immutable from 'immutable';
+import BigNumber from 'bignumber.js';
+
 import {PrivateKey, PublicKey, ChainValidation, key, ChainStore, ChainConfig, Apis} from "peerplaysjs-lib";
 //TO-DO: Replace with Peerplays explorer.
 const EXPLORER = {
@@ -136,41 +138,54 @@ export default class PPY extends Plugin {
 
 	hasUntouchableTokens(){ return false; }
 
-	//TO-DO: Format into token class
 	async balanceFor(account, token){
 		let fullAccount = await this.getFullAccount(account.name);
-		let balance;
+		let unformattedBalance;
 
 		if (token.symbol.toUpperCase() === 'PPY' ) {
-			balance = fullAccount.get('balances').get(0).get('balance')
+			const assetIndex = account.get('balances').findIndex((asset) => asset.get('asset_type') === '1.3.0');
+			unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance')
+		} else if (token.symbol.toUpperCase() === 'BTF') {
+			const assetIndex = account.get('balances').findIndex((asset) => asset.get('asset_type') === '1.3.1');
+			unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance')
 		} else {
-			balance = fullAccount.get('balances').get(1).get('balance')
+			return token;
 		}
+		const balance = new BigNumber(unformattedBalance)/(Math.pow(10, this.defaultDecimals()));
 		const clone = token.clone();
-		clone.amount = balance; // format this
+		clone.amount = balance;
 		return clone;
 
 	}
 
+	/***
+	 * Gets an array of token's values.
+	 * The `tokens` param might also be omitted which would mean to grab "all available tokens for an account".
+	 * Returns an array of Token class.
+	 */
 	async balancesFor(account, tokens, fallback = false){
-		// TO-DO: Update for Peerplays
-		if(!fallback && this.isEndorsedNetwork(account.network())){
-			const balances = await EosTokenAccountAPI.getAllTokens(account);
-			if(!balances) return this.balanceFor(account, tokens, true);
-			const blacklist = StoreService.get().state.scatter.settings.blacklistTokens.filter(x => x.blockchain === Blockchains.EOSIO).map(x => x.unique());
-			return balances.filter(x => !blacklist.includes(x.unique()));
-		}
-
-
-		return (await Promise.all(tokens.map(async token => {
+		let fullAccount = await this.getFullAccount(account.name);
+		
+		tokens.map((token) => {
 			const t = token.clone();
-			t.amount = await this.balanceFor(account, token);
-			t.chainId = account.network().chainId;
+			if (token.symbol.toUpperCase() === 'PPY' ) {
+				const assetIndex = account.get('balances').findIndex((asset) => asset.get('asset_type') === '1.3.0');
+				unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance');
+				const balance = new BigNumber(unformattedBalance)/(Math.pow(10, this.defaultDecimals()));
+				t.amount = balance;
+			} else if (token.symbol.toUpperCase() === 'BTF') {
+				const assetIndex = account.get('balances').findIndex((asset) => asset.get('asset_type') === '1.3.1');
+				unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance');
+				const balance = new BigNumber(unformattedBalance)/(Math.pow(10, this.defaultDecimals()));
+				t.amount = balance;
+			}
 			return t;
-		})));
+		})
+
+
 	}
 
-	defaultDecimals(){ return 4; }
+	defaultDecimals(){ return 8; }
 	defaultToken(){ return new Token(Blockchains.PPY, 'ppy', 'PPY', 'PPY', this.defaultDecimals(), MAINNET_CHAIN_ID) }
 	actionParticipants(payload){ return payload.transaction.participants }
 
