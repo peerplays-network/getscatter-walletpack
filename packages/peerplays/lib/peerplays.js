@@ -171,14 +171,12 @@ export default class PPY extends Plugin {
 			if (token.symbol.toUpperCase() === 'PPY' ) {
 				const assetIndex = account.get('balances').findIndex((asset) => asset.get('asset_type') === '1.3.0');
 				unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance');
-				const balance = new BigNumber(unformattedBalance)/(Math.pow(10, this.defaultDecimals()));
-				t.amount = balance;
 			} else if (token.symbol.toUpperCase() === 'BTF') {
 				const assetIndex = account.get('balances').findIndex((asset) => asset.get('asset_type') === '1.3.1');
 				unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance');
-				const balance = new BigNumber(unformattedBalance)/(Math.pow(10, this.defaultDecimals()));
-				t.amount = balance;
 			}
+			const balance = new BigNumber(unformattedBalance)/(Math.pow(10, this.defaultDecimals()));
+			t.amount = balance;
 			return t;
 		})
 
