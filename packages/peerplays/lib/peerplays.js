@@ -11,7 +11,8 @@ import TokenService from                "@walletpack/core/services/utility/Token
 import EventService from                "@walletpack/core/services/utility/EventService";
 import SigningService from              "@walletpack/core/services/secure/SigningService";
 import ecc from 'eosjs-ecc';
-import {PrivateKey, PublicKey, ChainValidation, key, ChainStore} from "peerplaysjs-lib";
+import Immutable from 'immutable';
+import {PrivateKey, PublicKey, ChainValidation, key, ChainStore, ChainConfig, Apis} from "peerplaysjs-lib";
 //TO-DO: Replace with Peerplays explorer.
 const EXPLORER = {
 	"name":"PeerplaysBlockchain",
@@ -27,6 +28,53 @@ export default class PPY extends Plugin {
 	constructor(){
 		 super('ppy', PluginTypes.BLOCKCHAIN_SUPPORT) 
 	}
+
+	init(){
+		console.log('INIT');
+		Apis.instance('wss://api.eifos.org', true).init_promise.then((res) => {
+			ChainStore.init().then(() => {
+				Apis.instance().db_api().exec( "set_subscribe_callback", [ console.log('set_subscribe_callback update:\n', object), true ] )
+			});
+		  }).catch((e) => {
+			  console.log(e);
+		  });
+	}
+
+	callBlockchainApi(apiPluginName, methodName, params = []) {
+		let apiPlugin;
+	
+		if (apiPluginName === 'db_api') {
+		  apiPlugin = Apis
+			.instance()
+			.db_api();
+	
+		  return apiPlugin
+			.exec(methodName, params)
+			.then((result) => {
+			  return Immutable.fromJS(result);
+			})
+			.catch((err) => {
+			  // Intercept and log
+			  log.error(`Error in calling ${apiPluginName}\nMethod: ${methodName}\nParams: ${JSON.stringify(params)}\nError: `, err);
+			  // Return an empty response rather than throwing an error.
+			  return Immutable.fromJS({});
+			});
+		}
+	  }
+
+	callBlockchainDbApi(methodName, params = []) {
+		return this.callBlockchainApi('db_api', methodName, params);
+	  }
+
+	getFullAccount(accountNameOrId) {
+		return this.callBlockchainDbApi('get_full_accounts', [[accountNameOrId], true]).then((result) => {
+		  const fullAccount = result.getIn([0, 1]);
+		  // Return the full account
+		  return fullAccount;
+		});
+	  }
+
+	  
 
 	bip(){ return `44'/194'/0'/0/`}
 	bustCache(){ cachedInstances = {}; }
@@ -88,21 +136,20 @@ export default class PPY extends Plugin {
 
 	hasUntouchableTokens(){ return false; }
 
+	//TO-DO: Format into token class
 	async balanceFor(account, token){
-		// TO-DO: Update for Peerplays
-		const balances = await Promise.race([
-			new Promise(resolve => setTimeout(() => resolve([]), 10000)),
-			getTableRows(account.network(), {
-				json:true,
-				code:token.contract,
-				scope:account.name,
-				table:'accounts',
-				limit:500
-			}).then(res => res.rows).catch(() => [])
-		]);
+		let account = await this.getFullAccount(account.name);
+		let balance;
 
-		const row = balances.find(row => row.balance.split(" ")[1].toLowerCase() === token.symbol.toLowerCase());
-		return row ? row.balance.split(" ")[0] : 0;
+		if (token.symbol.toUpperCase() === 'PPY' ) {
+			balance = account.get('balances').get(0).get('balance')
+		} else {
+			balance = account.get('balances').get(1).get('balance')
+		}
+		const clone = token.clone();
+		clone.amount = balance; // format this
+		return clone;
+
 	}
 
 	async balancesFor(account, tokens, fallback = false){
