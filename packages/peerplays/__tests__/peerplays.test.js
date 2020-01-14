@@ -26,7 +26,7 @@ const account = Account.fromJson({
 	keypairUnique:keypair.unique(),
 	networkUnique:network.unique(),
 	publicKey:keypair.publicKeys[0].key,
-	name: 'eifos-witness'
+	name: 'se-dogperson420'
 });
 
 
@@ -34,9 +34,9 @@ const token = Token.fromJson({
 	// contract:'TCN77KWWyUyi2A4Cu7vrh5dnmRyvUuME1E',
 	blockchain:Blockchains.PPY,
 	symbol:'PPY',
-	decimals:5,
+	decimals:8,
 	chainId:network.chainId
-})
+}, )
 
 // Removing need for StoreService's state
 account.network = () => network;
@@ -48,17 +48,30 @@ describe('peerplays', () => {
 			peerplays.init();
 			done();
 	    })
-    });
-});
+	});
+	
+	// it('should be able to get all balances', done => {
+	// 	new Promise(async() => {
+	// 		setTimeout(async() => {
+	// 			const account = Account.fromJson({
+	// 				keypairUnique:keypair.unique(),
+	// 				networkUnique:network.unique(),
+	// 				publicKey:keypair.publicKeys[0].key,
+	// 				name: '<peerplays username goes here>'
+	// 			});
 
-// describe('peerplays', () => {
-//     it('should be able to retrieve balance', done => {
-//     	new Promise(async() => {
-// 			await peerplays.init();
-// 			const balances = await peerplays.balanceFor(account, 'PPY');
-// 			console.log('balances', balances);
-//     		done();
-// 	    })
-//     });
-// });
+	// 			const token = [ Token.fromJson({
+	// 				// contract:'TCN77KWWyUyi2A4Cu7vrh5dnmRyvUuME1E',
+	// 				blockchain:Blockchains.PPY,
+	// 				symbol:'PPY',
+	// 				decimals:8,
+	// 				chainId:network.chainId
+	// 			})]
+	// 			let x = await peerplays.balancesFor(account, token)
+	// 			console.log('RESULT', x);
+	// 			done();
+	// 		}, 5000);
+	// 	})
+	// });
+});
 

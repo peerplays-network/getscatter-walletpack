@@ -32,14 +32,22 @@ export default class PPY extends Plugin {
 	}
 
 	init(){
-		console.log('INIT');
 		Apis.instance('wss://api.eifos.org', true).init_promise.then((res) => {
-			ChainStore.init().then(() => {
-				Apis.instance().db_api().exec( "set_subscribe_callback", [ console.log('set_subscribe_callback update:\n', object), true ] )
-			});
-		  }).catch((e) => {
-			  console.log(e);
-		  });
+			// this.connectionStatusCallback(true);
+			// Print out which blockchain we are connecting to
+			console.log('Connected to:', res[0]
+			  ? res[0].network_name
+			  : 'Undefined Blockchain');
+
+			  ChainStore
+			  .init()
+			  .then(() => {
+				  console.log('Chainstore initialized');
+			  })
+			  .catch((err) => {
+				console.error('error: ',err);
+			  });
+		  })
 	}
 
 	callBlockchainApi(apiPluginName, methodName, params = []) {
@@ -141,16 +149,15 @@ export default class PPY extends Plugin {
 	async balanceFor(account, token){
 		let fullAccount = await this.getFullAccount(account.name);
 		let unformattedBalance;
+		let assetId = '1.3.0';
 
 		if (token.symbol.toUpperCase() === 'PPY' ) {
-			const assetIndex = account.get('balances').findIndex((asset) => asset.get('asset_type') === '1.3.0');
-			unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance')
+			assetId = '1.3.0'
 		} else if (token.symbol.toUpperCase() === 'BTF') {
-			const assetIndex = account.get('balances').findIndex((asset) => asset.get('asset_type') === '1.3.1');
-			unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance')
-		} else {
-			return token;
+			assetId = '1.3.1'
 		}
+		const assetIndex = fullAccount.get('balances').findIndex((asset) => asset.get('asset_type') === assetId);
+		unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance')
 		const balance = new BigNumber(unformattedBalance)/(Math.pow(10, this.defaultDecimals()));
 		const clone = token.clone();
 		clone.amount = balance;
@@ -165,17 +172,26 @@ export default class PPY extends Plugin {
 	 */
 	async balancesFor(account, tokens, fallback = false){
 		let fullAccount = await this.getFullAccount(account.name);
+		let unformattedBalance;
 		let tokenArray = [];
-		
+		let assetId = '1.3.0';
+
 		tokens.map((token) => {
 			const t = token.clone();
+
 			if (token.symbol.toUpperCase() === 'PPY' ) {
-				const assetIndex = account.get('balances').findIndex((asset) => asset.get('asset_type') === '1.3.0');
-				unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance');
+				assetId = '1.3.0'
 			} else if (token.symbol.toUpperCase() === 'BTF') {
-				const assetIndex = account.get('balances').findIndex((asset) => asset.get('asset_type') === '1.3.1');
-				unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance');
+				assetId = '1.3.1'
 			}
+
+			let assetIndex = fullAccount.get('balances').findIndex((asset) => asset.get('asset_type') === assetId);
+
+			if (assetIndex === -1) {
+				return;
+			}
+
+			unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance');
 			const balance = new BigNumber(unformattedBalance)/(Math.pow(10, this.defaultDecimals()));
 			t.amount = balance;
 			tokenArray.push(t);
