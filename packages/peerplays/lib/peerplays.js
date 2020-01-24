@@ -32,7 +32,7 @@ export default class PPY extends Plugin {
 	}
 
 	init(){
-		Apis.instance('wss://api.eifos.org', true).init_promise.then((res) => {
+		Apis.instance(network.fullhost(), true).init_promise.then((res) => {
 			// this.connectionStatusCallback(true);
 			// Print out which blockchain we are connecting to
 			console.log('Connected to:', res[0]
@@ -76,14 +76,19 @@ export default class PPY extends Plugin {
 		return this.callBlockchainApi('db_api', methodName, params);
 	  }
 
-	getFullAccount(accountNameOrId) {
-		return this.callBlockchainDbApi('get_full_accounts', [[accountNameOrId], true]).then((result) => {
-		  const fullAccount = result.getIn([0, 1]);
-		  // Return the full account
-		  return fullAccount;
-		});
+	  async getFullAccount (accountNameOrId) {
+		const response = await fetch(network.fullhost(), {
+			body: `{\"method\": \"call\", \"params\": [\"database\", \"get_full_accounts\", [[\"${accountNameOrId}\"], true]], \"jsonrpc\": \"2.0\", \"id\": 1}`,
+			headers: {
+			  "Content-Type": "application/x-www-form-urlencoded"
+			},
+			method: "POST"
+		  });
+	
+		const data = await response.json();
+		return data.result[0][1];
+		
 	  }
-
 	  
 
 	bip(){ return `44'/194'/0'/0/`}
@@ -146,6 +151,10 @@ export default class PPY extends Plugin {
 
 	hasUntouchableTokens(){ return false; }
 
+	/***
+	 * Gets a single token's balance.
+	 * Returns a Token class where `token.amount` is the balance.
+	 */
 	async balanceFor(account, token){
 		let fullAccount = await this.getFullAccount(account.name);
 		let unformattedBalance;
@@ -156,14 +165,15 @@ export default class PPY extends Plugin {
 		} else if (token.symbol.toUpperCase() === 'BTF') {
 			assetId = '1.3.1'
 		}
-		const assetIndex = fullAccount.get('balances').findIndex((asset) => asset.get('asset_type') === assetId);
-		unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance')
+		const assetIndex = fullAccount.balances.findIndex((asset) => asset.asset_type === assetId);
+		unformattedBalance = fullAccount.balances[assetIndex].balance
 		const balance = new BigNumber(unformattedBalance)/(Math.pow(10, this.defaultDecimals()));
 		const clone = token.clone();
 		clone.amount = balance;
 		return clone;
 
 	}
+
 
 	/***
 	 * Gets an array of token's values.
@@ -178,27 +188,27 @@ export default class PPY extends Plugin {
 
 		tokens.map((token) => {
 			const t = token.clone();
+			const symbol = token.symbol.toUpperCase();
 
-			if (token.symbol.toUpperCase() === 'PPY' ) {
+			if (symbol === 'PPY' ) {
 				assetId = '1.3.0'
-			} else if (token.symbol.toUpperCase() === 'BTF') {
+			} else if (symbol === 'BTF') {
 				assetId = '1.3.1'
 			}
 
-			let assetIndex = fullAccount.get('balances').findIndex((asset) => asset.get('asset_type') === assetId);
+			let assetIndex = fullAccount.balances.findIndex((asset) => asset.asset_type === assetId);
 
 			if (assetIndex === -1) {
 				return;
 			}
 
-			unformattedBalance = fullAccount.get('balances').get(assetIndex).get('balance');
+			unformattedBalance = fullAccount.balances[assetIndex].balance;
 			const balance = new BigNumber(unformattedBalance)/(Math.pow(10, this.defaultDecimals()));
 			t.amount = balance;
 			tokenArray.push(t);
 		})
 
 		return tokenArray;
-
 	}
 
 	defaultDecimals(){ return 8; }
