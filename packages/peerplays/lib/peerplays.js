@@ -148,17 +148,18 @@ export default class PPY extends Plugin {
     return false;
   }
 
-  defaultDecimals() {
-    return 8;
+  async defaultDecimals(assetId) {
+    const asset = await this.getAsset(assetId);
+    return asset.precision || 5;
   }
 
-  defaultToken() {
+  async defaultToken() {
     return new Token(
       Blockchains.PPY,
       'ppy',
       'PPY',
       'PPY',
-      this.defaultDecimals(),
+      await this.defaultDecimals('1.3.0'),
       MAINNET_CHAIN_ID
     );
   }
@@ -212,6 +213,30 @@ export default class PPY extends Plugin {
     return this.callBlockchainApi('db_api', methodName, params);
   }
 
+  /**
+   * Requests a users' public keys from the Peerplays blockchain.
+   * Keys are returned as an array with key order of owner, active, then memo.
+   *
+   * @param {String} accountNameOrId - ie: 'mcs' || '1.2.26'
+   * @returns {Array} keys - [ownerPublicKey, activePublicKey, memoPublicKey]
+   */
+
+	getAsset(assetID) {
+		if (!assetID) {
+		  throw new Error('getAsset: Missing inputs');
+		}
+		let response = await fetch(endpoint, {
+		  body: `{\"method\": \"call\", \"params\": [\"database\", \"${methods.GET_ASSET}\", [[\"${assetID}\"]]], \"jsonrpc\": \"2.0\", \"id\": 1}`,
+		  headers: {
+			'Content-Type': 'application/x-www-form-urlencoded',
+		  },
+		  method: 'POST',
+		});
+		let parsedRes = await response.json();
+		// console.log(parsedRes.result[0])
+		return parsedRes.result[0];
+	  }
+
   /***
    * Gets a single token's balance.
    * Returns a Token class where `token.amount` is the balance.
@@ -228,7 +253,7 @@ export default class PPY extends Plugin {
     }
     const assetIndex = fullAccount.balances.findIndex(asset => asset.asset_type === assetId);
     unformattedBalance = fullAccount.balances[assetIndex].balance;
-    const balance = new BigNumber(unformattedBalance) / Math.pow(10, this.defaultDecimals());
+    const balance = new BigNumber(unformattedBalance) / Math.pow(10, await this.defaultDecimals(assetId));
     const clone = token.clone();
     clone.amount = balance;
     return clone;
@@ -262,7 +287,7 @@ export default class PPY extends Plugin {
       }
 
       unformattedBalance = fullAccount.balances[assetIndex].balance;
-      const balance = new BigNumber(unformattedBalance) / Math.pow(10, this.defaultDecimals());
+      const balance = new BigNumber(unformattedBalance) / Math.pow(10, await this.defaultDecimals(assetId));
       t.amount = balance;
       tokenArray.push(t);
     });
