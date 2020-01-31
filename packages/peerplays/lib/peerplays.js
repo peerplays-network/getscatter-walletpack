@@ -221,7 +221,7 @@ export default class PPY extends Plugin {
    * @returns {Array} keys - [ownerPublicKey, activePublicKey, memoPublicKey]
    */
 
-	getAsset(assetID) {
+	async getAsset(assetID) {
 		if (!assetID) {
 		  throw new Error('getAsset: Missing inputs');
 		}
@@ -270,7 +270,7 @@ export default class PPY extends Plugin {
     let tokenArray = [];
     let assetId = '1.3.0';
 
-    tokens.map(token => {
+    tokens.map(async (token) => {
       const t = token.clone();
       const symbol = token.symbol.toUpperCase();
 
