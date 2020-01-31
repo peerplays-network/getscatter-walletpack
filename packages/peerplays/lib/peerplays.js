@@ -360,6 +360,32 @@ export default class PPY extends Plugin {
   }
 
   /**
+   * peerplaysjs-lib.Login will generate keys from provided data and compare them with the ones pulled from the
+   * Peerplays blockchain (`userPubKeys`).
+   *
+   * @param {String} username - The login username to associate with the account to be registered.
+   * @param {String} password - The login password to associate with the account to be registered.
+   * @param {String} prefix - Optional prefix.
+   * @returns {Boolean}
+   */
+  async authUser(username, password, prefix = 'PPY') {
+    // Ensure the Login class has the correct roles configured.
+    const roles = ['owner', 'active', 'memo'];
+    Login.setRoles(roles);
+
+    const userPubKeys = await getAccountKeys(username);
+
+    const user = {
+      accountName: username,
+      password,
+      auths: userPubKeys,
+    };
+
+    const authed = Login.checkKeys(user, prefix);
+    return authed;
+  }
+
+  /**
    * Requests from Peerplays blockchain for account data object.
    *
    * @param {String} accountNameOrId - The Peerplays account username to request data for.
