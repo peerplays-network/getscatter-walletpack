@@ -38,7 +38,9 @@ const roles = ['owner', 'active', 'memo'];
 const MAINNET_CHAIN_ID = '6b6b5f0ce7a36d323768e534f3edb41c6d6332a541a95725b98e28d140850134'; // alice
 const TESTNET_CHAIN_ID = 'b3f7fe1e5ad0d2deca40a626a4404524f78e65c3a48137551c33ea4e7c365672'; // beatrice
 
+const MAINNET_ENDPOINT_1 = 'https://pma.blockveritas.co/ws'
 const MAINNET_FAUCET = 'https://faucet.peerplays.download/faucet';
+const PREFIX = 'PPY';
 
 let isLegacy = false;
 let cachedInstances;
@@ -362,6 +364,31 @@ export default class PPY extends Plugin {
   }
 
   /**
+   * Requests a users' public keys from the Peerplays blockchain.
+   * Keys are returned as an array with key order of owner, active, then memo.
+   *
+   * @param {String} accountNameOrId - ie: 'mcs' || '1.2.26'
+   * @returns {Array} keys - [ownerPublicKey, activePublicKey, memoPublicKey]
+   */
+  async getAccountKeys(accountNameOrId) {
+    const keys = {};
+    const account = await this.getFullAccount(accountNameOrId);
+    roles.forEach(role => {
+      let key;
+
+      if (role === 'memo') {
+        key = [[account.options.memo_key, 1]];
+      } else {
+        key = account[role].key_auths;
+      }
+
+      keys[role] = key;
+    });
+
+    return keys;
+  }
+
+  /**
    * peerplaysjs-lib.Login will generate keys from provided data and compare them with the ones pulled from the
    * Peerplays blockchain (`userPubKeys`).
    *
@@ -374,7 +401,7 @@ export default class PPY extends Plugin {
     // Ensure the Login class has the correct roles configured.
     Login.setRoles(roles);
 
-    const userPubKeys = await getAccountKeys(username);
+    const userPubKeys = await this.getAccountKeys(username);
 
     const user = {
       accountName: username,
@@ -384,6 +411,7 @@ export default class PPY extends Plugin {
 
     // TODO: modify this such that the Scatter UI has the data it requires to import an existing account. Likely will require to generate keys and return them to something
     const authed = Login.checkKeys(user, prefix);
+
     return authed;
   }
 
@@ -395,7 +423,7 @@ export default class PPY extends Plugin {
    * @memberof PPY
    */
   async getFullAccount(accountNameOrId) {
-    let response = await fetch(network.fullhost(), {
+    let response = await fetch(MAINNET_ENDPOINT_1, {
       body: `{\"method\": \"call\", \"params\": [\"database\", \"${methods.GET_FULL_ACCOUNTS}\", [[\"${accountNameOrId}\"], true]], \"jsonrpc\": \"2.0\", \"id\": 1}`,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -404,6 +432,10 @@ export default class PPY extends Plugin {
     });
 
     let parsedRes = await response.json();
+
+    if (parsedRes && parsedRes.result.length === 0) {
+      throw new Error('getFullAccount: No account found');
+    }
 
     return parsedRes.result[0][1].account;
   }
@@ -432,7 +464,7 @@ export default class PPY extends Plugin {
    */
   async register(attempt, username, password, referral = null) {
     Login.setRoles(roles);
-    let keys = Login.generateKeys(username, password, roles, prefix);
+    let keys = Login.generateKeys(username, password, roles, PREFIX);
     const [ownerPub, activePub, memoPub] = [
       keys.pubKeys.owner,
       keys.pubKeys.active,
@@ -469,7 +501,7 @@ export default class PPY extends Plugin {
           throw new Error(err);
         } else {
           attempt++;
-          return register(attempt, username, password);
+          return this.register(attempt, username, password);
         }
       });
   }
