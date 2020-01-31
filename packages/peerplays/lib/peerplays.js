@@ -33,6 +33,8 @@ const methods = {
   BROADCAST: 'broadcast_transaction_with_callback',
 };
 
+const roles = ['owner', 'active', 'memo'];
+
 const MAINNET_CHAIN_ID = '6b6b5f0ce7a36d323768e534f3edb41c6d6332a541a95725b98e28d140850134'; // alice
 const TESTNET_CHAIN_ID = 'b3f7fe1e5ad0d2deca40a626a4404524f78e65c3a48137551c33ea4e7c365672'; // beatrice
 
@@ -370,7 +372,6 @@ export default class PPY extends Plugin {
    */
   async authUser(username, password, prefix = 'PPY') {
     // Ensure the Login class has the correct roles configured.
-    const roles = ['owner', 'active', 'memo'];
     Login.setRoles(roles);
 
     const userPubKeys = await getAccountKeys(username);
@@ -381,6 +382,7 @@ export default class PPY extends Plugin {
       auths: userPubKeys,
     };
 
+    // TODO: modify this such that the Scatter UI has the data it requires to import an existing account. Likely will require to generate keys and return them to something
     const authed = Login.checkKeys(user, prefix);
     return authed;
   }
