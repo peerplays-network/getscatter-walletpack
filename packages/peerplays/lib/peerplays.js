@@ -14,15 +14,8 @@ import ecc from 'eosjs-ecc';
 import Immutable from 'immutable';
 import BigNumber from 'bignumber.js';
 
-import {
-  PrivateKey,
-  PublicKey,
-  ChainValidation,
-  key,
-  ChainStore,
-  ChainConfig,
-  Apis,
-} from 'peerplaysjs-lib';
+import { PublicKey, ChainValidation, ChainStore, Login, Apis } from 'peerplaysjs-lib';
+
 //TO-DO: Replace with Peerplays explorer.
 const EXPLORER = {
   name: 'PeerplaysBlockchain',
@@ -31,7 +24,22 @@ const EXPLORER = {
   block: 'https://peerplaysblockchain.info/block/{x}',
 };
 
-const MAINNET_CHAIN_ID = 1;
+const methods = {
+  GET_REQUIRED_FEES: 'get_required_fees',
+  GET_OBJECTS: 'get_objects',
+  GET_FULL_ACCOUNTS: 'get_full_accounts',
+  GET_ACCOUNTS: 'get_accounts',
+  GET_ASSET: 'lookup_asset_symbols',
+  BROADCAST: 'broadcast_transaction_with_callback',
+};
+
+const MAINNET_CHAIN_ID = '6b6b5f0ce7a36d323768e534f3edb41c6d6332a541a95725b98e28d140850134'; // alice
+const TESTNET_CHAIN_ID = 'b3f7fe1e5ad0d2deca40a626a4404524f78e65c3a48137551c33ea4e7c365672'; // beatrice
+
+const MAINNET_FAUCET = 'https://faucet.peerplays.download/faucet';
+
+let isLegacy = false;
+let cachedInstances;
 
 export default class PPY extends Plugin {
   constructor() {
@@ -41,15 +49,19 @@ export default class PPY extends Plugin {
   bip() {
     return `44'/194'/0'/0/`;
   }
+
   bustCache() {
     cachedInstances = {};
   }
+
   defaultExplorer() {
     return EXPLORER;
   }
+
   accountFormatter(account) {
     return `${account.publicKey}`;
   }
+
   returnableAccount(account) {
     return { name: account.name, address: account.publicKey, blockchain: Blockchains.PPY };
   }
@@ -200,19 +212,6 @@ export default class PPY extends Plugin {
     return this.callBlockchainApi('db_api', methodName, params);
   }
 
-  async getFullAccount(accountNameOrId) {
-    const response = await fetch(network.fullhost(), {
-      body: `{\"method\": \"call\", \"params\": [\"database\", \"get_full_accounts\", [[\"${accountNameOrId}\"], true]], \"jsonrpc\": \"2.0\", \"id\": 1}`,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      method: 'POST',
-    });
-
-    const data = await response.json();
-    return data.result[0][1];
-  }
-
   /***
    * Gets a single token's balance.
    * Returns a Token class where `token.amount` is the balance.
@@ -358,5 +357,92 @@ export default class PPY extends Plugin {
     if (payload.transaction.hasOwnProperty('serializedTransaction'))
       return this.parseEosjs2Request(payload, network);
     else return this.parseEosjsRequest(payload, network);
+  }
+
+  /**
+   * Requests from Peerplays blockchain for account data object.
+   *
+   * @param {String} accountNameOrId - The Peerplays account username to request data for.
+   * @returns {Object}
+   * @memberof PPY
+   */
+  async getFullAccount(accountNameOrId) {
+    let response = await fetch(network.fullhost(), {
+      body: `{\"method\": \"call\", \"params\": [\"database\", \"${methods.GET_FULL_ACCOUNTS}\", [[\"${accountNameOrId}\"], true]], \"jsonrpc\": \"2.0\", \"id\": 1}`,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      method: 'POST',
+    });
+
+    let parsedRes = await response.json();
+
+    return parsedRes.result[0][1].account;
+  }
+
+  /**
+   * Will generate keys from username and password via the peerplaysjs-lib.
+   * The public keys for owner, active, and memo are then sent to the faucet that handles account registrations for the configured chain.
+   * Once keys are generated and adequate data is provided, a register attempt will be made to the configured faucet endpoint.
+   * A Peerplays account password should be generated via randomstring npm package.
+   *
+   * @param {Number} attempt - The number of attempts to start off with.
+   * @param {String} username - The login username to associate with the account to be registered.
+   * @param {String} password - The login password to associate with the account to be registered.
+   * @param {String} referral - Optional referral Peerplays account username.
+   * @returns {Object} - The account data that was registered if successful or associated error if registration failed ie:
+   * {
+   *   account: {
+   *     active_key: 'TEST6vw2TA6QXTXWHeoRhq6Sv7F4Pdq5fNkddBGbrY31iCRjEDZnby',
+   *     memo_key: 'TEST8C7kCkp6rd3UP4ayVS2o2WyEh9MgrY2Ud4b8SXCWEUfBAspNa6',
+   *     name: 'mcs4455',
+   *     owner_key: 'TEST7HERrHiogdB5749RahGDKoMHhK3qbwvWABvqpVARrY76b2qcTM',
+   *     referrer: 'nathan'
+   *  }
+   * }
+   * @memberof PPY
+   */
+  async register(attempt, username, password, referral = null) {
+    Login.setRoles(roles);
+    let keys = Login.generateKeys(username, password, roles, prefix);
+    const [ownerPub, activePub, memoPub] = [
+      keys.pubKeys.owner,
+      keys.pubKeys.active,
+      keys.pubKeys.memo,
+    ];
+
+    if (!attempt || !username || !password) {
+      throw new Error('register: Missing inputs');
+    }
+
+    const fetchBody = JSON.stringify({
+      account: {
+        name: username,
+        owner_key: ownerPub,
+        active_key: activePub,
+        memo_key: memoPub,
+        refcode: referral || '',
+        referrer: referral,
+      },
+    });
+
+    return await fetch(MAINNET_FAUCET, {
+      method: 'post',
+      mode: 'cors',
+      headers: {
+        Accept: 'application/json',
+        'Content-type': 'application/json',
+      },
+      body: fetchBody,
+    })
+      .then(res => res.json())
+      .catch(err => {
+        if (attempt > 2) {
+          throw new Error(err);
+        } else {
+          attempt++;
+          return register(attempt, username, password);
+        }
+      });
   }
 }
