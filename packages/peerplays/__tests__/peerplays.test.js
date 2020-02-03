@@ -10,6 +10,7 @@ import Token from '@walletpack/core/lib/models/Token';
 import { ResolvePlugin } from 'webpack';
 import { asset } from 'peerplaysjs-lib/dist/serializer/src/operations';
 
+
 const peerplays = new (require('../lib/peerplays').default)();
 const RandomString = require('randomstring');
 
@@ -79,17 +80,18 @@ describe('peerplays', () => {
   // 	})
   // });
   
-  it('defaultDecimals', done => {
+it('defaultDecimals', done => {
     new Promise(async() => {
-            let x = await peerplays.defaultDecimals('1.3.0')
+            let x = await peerplays.defaultDecimals('1.3.0');
             console.log('RESULT', x);
+            assert(x === 5, 'invalid decimal count');
             done();
     })
 });
 
 it('defaultToken()', done => {
     new Promise(async() => {
-            let x = await peerplays.defaultToken()
+            let x = await peerplays.defaultToken();
             console.log('RESULT', x);
             done();
     })
@@ -97,11 +99,32 @@ it('defaultToken()', done => {
 
 it('isValidRecipient()', done => {
   new Promise(async() => {
-          let x = await peerplays.isValidRecipient('init1')
+          let x = await peerplays.isValidRecipient('init1');
           console.log('RESULT', x);
+          assert(x === true, 'recipient invalid name');
           done();
   })
 });
+
+const TEST_KEY = '5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX';
+const TEST_PUBLIC_KEY = 'TEST6UdzJXcRwdRCfsV5tYGWzmMs5CvPnKqymTX1DkhFQdFFUmizBA';
+
+    it('should convert a private key to a public key', done => {
+        new Promise(async () => {
+      assert(peerplays.privateToPublic(TEST_KEY) === TEST_PUBLIC_KEY, 'Bad public key');
+      // console.log('privateToPublic result', peerplays.privateToPublic('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX'));
+			// assert(peerplays.privateToPublic('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX') === TEST_PUBLIC_KEY, 'Mismatched public key');
+            done();
+        })
+    });
+	
+    it('should check if a private key is valid', done => {
+        new Promise(async () => {
+			assert(peerplays.validPrivateKey(TEST_KEY), 'Bad private key checker 1');
+			// assert(!peerplays.validPrivateKey('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX'), 'Bad private key checker 2');
+            done();
+        })
+    });
 
 //   it('should be able to retrieve a Peerplays accounts keys', async() => {
 //     const username = 'init1';
