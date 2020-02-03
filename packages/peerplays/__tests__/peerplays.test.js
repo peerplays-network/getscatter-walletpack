@@ -78,36 +78,80 @@ describe('peerplays', () => {
   // 		}, 5000);
   // 	})
   // });
+  
+  it('defaultDecimals', done => {
+    new Promise(async() => {
+            const account = Account.fromJson({
+                keypairUnique:keypair.unique(),
+                networkUnique:network.unique(),
+                publicKey:keypair.publicKeys[0].key,
+                name: '<peerplays username goes here>'
+            });
 
-  it('should be able to retrieve a Peerplays accounts keys', async() => {
-    const username = 'init1';
-    assert.typeOf(await peerplays.getAccountKeys(username), 'object')
-  })
+            const token = [ Token.fromJson({
+                // contract:'TCN77KWWyUyi2A4Cu7vrh5dnmRyvUuME1E',
+                blockchain:Blockchains.PPY,
+                symbol:'PPY',
+                decimals:8,
+                chainId:network.chainId
+            })]
+            let x = await peerplays.defaultDecimals('1.3.0')
+            console.log('RESULT', x);
+            done();
+    })
+});
 
-  it('should be able to retrieve a Peerplays account', async() => {
-    const username = 'init1';
-    assert.typeOf(await peerplays.getFullAccount(username), 'object');
-  });
+it('defaultToken()', done => {
+    new Promise(async() => {
+            const account = Account.fromJson({
+                keypairUnique:keypair.unique(),
+                networkUnique:network.unique(),
+                publicKey:keypair.publicKeys[0].key,
+                name: '<peerplays username goes here>'
+            });
 
-  it('should successfully authorize a Peerplays account', async() => {
-    const username = 'testuser45';
-    const password = 'eu9xbavfc9DNWXd72P1TqHcwxjpY4YIuoYGlDq7Mw3COoqgILMer';
-    assert.equal(await peerplays.authUser(username, password), true)
-  });
+            const token = [ Token.fromJson({
+                // contract:'TCN77KWWyUyi2A4Cu7vrh5dnmRyvUuME1E',
+                blockchain:Blockchains.PPY,
+                symbol:'PPY',
+                decimals:8,
+                chainId:network.chainId
+            })]
+            let x = await peerplays.defaultToken()
+            console.log('RESULT', x);
+            done();
+    })
+});
 
-  it('should attempt to register a new Peerplays account (ip limit)', async() => {
-    const username = RandomString.generate({
-      length: 12,
-      charset: 'alphanumeric'
-    });
+//   it('should be able to retrieve a Peerplays accounts keys', async() => {
+//     const username = 'init1';
+//     assert.typeOf(await peerplays.getAccountKeys(username), 'object')
+//   })
 
-    const password = RandomString.generate({
-      length: 52,
-      charset: 'alphanumeric'
-    });
+//   it('should be able to retrieve a Peerplays account', async() => {
+//     const username = 'init1';
+//     assert.typeOf(await peerplays.getFullAccount(username), 'object');
+//   });
 
-    console.log(`Testing registration with following data: \nusername: ${username} \npassword: ${password}`)
+//   it('should successfully authorize a Peerplays account', async() => {
+//     const username = 'testuser45';
+//     const password = 'eu9xbavfc9DNWXd72P1TqHcwxjpY4YIuoYGlDq7Mw3COoqgILMer';
+//     assert.equal(await peerplays.authUser(username, password), true)
+//   });
 
-    assert.typeOf(await peerplays.register(1, username, password), 'object');
-  })
+//   it('should attempt to register a new Peerplays account (ip limit)', async() => {
+//     const username = RandomString.generate({
+//       length: 12,
+//       charset: 'alphanumeric'
+//     });
+
+//     const password = RandomString.generate({
+//       length: 52,
+//       charset: 'alphanumeric'
+//     });
+
+//     console.log(`Testing registration with following data: \nusername: ${username} \npassword: ${password}`)
+
+//     assert.typeOf(await peerplays.register(1, username, password), 'object');
+//   })
 });
