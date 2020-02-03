@@ -13,8 +13,8 @@ import SigningService from '@walletpack/core/services/secure/SigningService';
 import ecc from 'eosjs-ecc';
 import Immutable from 'immutable';
 import BigNumber from 'bignumber.js';
-
 import { PublicKey, ChainValidation, ChainStore, Login, Apis } from 'peerplaysjs-lib';
+const fetch = require("node-fetch");
 
 //TO-DO: Replace with Peerplays explorer.
 const EXPLORER = {
