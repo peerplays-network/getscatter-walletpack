@@ -81,20 +81,6 @@ describe('peerplays', () => {
   
   it('defaultDecimals', done => {
     new Promise(async() => {
-            const account = Account.fromJson({
-                keypairUnique:keypair.unique(),
-                networkUnique:network.unique(),
-                publicKey:keypair.publicKeys[0].key,
-                name: '<peerplays username goes here>'
-            });
-
-            const token = [ Token.fromJson({
-                // contract:'TCN77KWWyUyi2A4Cu7vrh5dnmRyvUuME1E',
-                blockchain:Blockchains.PPY,
-                symbol:'PPY',
-                decimals:8,
-                chainId:network.chainId
-            })]
             let x = await peerplays.defaultDecimals('1.3.0')
             console.log('RESULT', x);
             done();
@@ -103,24 +89,18 @@ describe('peerplays', () => {
 
 it('defaultToken()', done => {
     new Promise(async() => {
-            const account = Account.fromJson({
-                keypairUnique:keypair.unique(),
-                networkUnique:network.unique(),
-                publicKey:keypair.publicKeys[0].key,
-                name: '<peerplays username goes here>'
-            });
-
-            const token = [ Token.fromJson({
-                // contract:'TCN77KWWyUyi2A4Cu7vrh5dnmRyvUuME1E',
-                blockchain:Blockchains.PPY,
-                symbol:'PPY',
-                decimals:8,
-                chainId:network.chainId
-            })]
             let x = await peerplays.defaultToken()
             console.log('RESULT', x);
             done();
     })
+});
+
+it('isValidRecipient()', done => {
+  new Promise(async() => {
+          let x = await peerplays.isValidRecipient('init1')
+          console.log('RESULT', x);
+          done();
+  })
 });
 
 //   it('should be able to retrieve a Peerplays accounts keys', async() => {
