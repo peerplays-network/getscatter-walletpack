@@ -8,6 +8,7 @@
     "publish": "node ./scripts/prepublish.js && lerna publish",
     "testfile": "cross-env WALLETPACK_TESTING=true mocha --require @babel/register --require @babel/polyfill --exit --timeout 1000000",
     "test": "npm run testfile \"./packages/**/__tests__/**/*.test.js\"",
+    "test:ppy": "mocha ./packages/peerplays/__tests__/**/*.test.js --require @babel/register --require @babel/polyfill --exit --timeout 1000000",
     "pack": "webpack-cli --mode=production --display-error-details"
   },
   "dependencies": {},
