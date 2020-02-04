@@ -13,7 +13,7 @@ import SigningService from '@walletpack/core/services/secure/SigningService';
 import ecc from 'eosjs-ecc';
 import Immutable from 'immutable';
 import BigNumber from 'bignumber.js';
-import { PublicKey, ChainValidation, ChainStore, Login, Apis } from 'peerplaysjs-lib';
+import { PublicKey, ChainValidation, ChainStore, Login, Apis, PrivateKey as Pkey } from 'peerplaysjs-lib';
 const fetch = require('node-fetch');
 
 //TO-DO: Replace with Peerplays explorer.
@@ -122,10 +122,7 @@ export default class PPY extends Plugin {
   }
 
   privateToPublic(privateKey, prefix = null) {
-    return ecc
-      .PrivateKey(privateKey)
-      .toPublic()
-      .toString(prefix ? prefix : 'PPY');
+    return Pkey.fromWif(privateKey).toPublicKey().toString(prefix ? prefix : 'PPY');
   }
 
   validPrivateKey(privateKey) {
@@ -141,11 +138,12 @@ export default class PPY extends Plugin {
   }
 
   bufferToHexPrivate(buffer) {
-    return ecc.PrivateKey.fromBuffer(Buffer.from(buffer)).toString();
+    const bufKey = Pkey.fromBuffer(Buffer.from(buffer))
+    return bufKey.toWif();
   }
 
   hexPrivateToBuffer(privateKey) {
-    return new ecc.PrivateKey(privateKey).toBuffer();
+    return new Pkey.fromWif(privateKey).toBuffer();
   }
 
   hasUntouchableTokens() {
@@ -229,7 +227,7 @@ export default class PPY extends Plugin {
     if (!assetID) {
       throw new Error('getAsset: Missing inputs');
     }
-    let response = await fetch(endpoint, {
+    let response = await fetch(MAINNET_ENDPOINT_1, {
       body: `{\"method\": \"call\", \"params\": [\"database\", \"${methods.GET_ASSET}\", [[\"${assetID}\"]]], \"jsonrpc\": \"2.0\", \"id\": 1}`,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

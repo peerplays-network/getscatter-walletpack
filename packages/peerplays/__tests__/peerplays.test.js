@@ -12,6 +12,7 @@ import { asset } from 'peerplaysjs-lib/dist/serializer/src/operations';
 
 const peerplays = new (require('../lib/peerplays').default)();
 const RandomString = require('randomstring');
+const prefix = 'TEST';
 
 const keypair = Keypair.fromJson({
   name: 'Testing key',
@@ -48,48 +49,35 @@ account.network = () => network;
 account.sendable = () => account.publicKey;
 
 describe('peerplays', () => {
-  // it('should be able to get all balances', done => {
-  // 	new Promise(async() => {
-  // 		setTimeout(async() => {
-  // 			const account = Account.fromJson({
-  // 				keypairUnique:keypair.unique(),
-  // 				networkUnique:network.unique(),
-  // 				publicKey:keypair.publicKeys[0].key,
-  // 				name: '<peerplays username goes here>'
-  // 			});
+  const TEST_KEY = '5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX';
+  const TEST_PUBLIC_KEY = 'TEST6UdzJXcRwdRCfsV5tYGWzmMs5CvPnKqymTX1DkhFQdFFUmizBA';
 
-  // 			const token = [ Token.fromJson({
-  // 				// contract:'TCN77KWWyUyi2A4Cu7vrh5dnmRyvUuME1E',
-  // 				blockchain:Blockchains.PPY,
-  // 				symbol:'PPY',
-  // 				decimals:8,
-  // 				chainId:network.chainId
-  // 			})]
-  // 			let x = await peerplays.balancesFor(account, token)
-  // 			console.log('RESULT', x);
-  // 			done();
-  // 		}, 5000);
-  // 	})
-  // });
+  it('should convert a private key to a public key', done => {
+    new Promise(async () => {
+      assert(peerplays.privateToPublic(TEST_KEY, prefix) === TEST_PUBLIC_KEY, 'Bad public key'); // Prefix TEST on testnets
+      // console.log('privateToPublic result', peerplays.privateToPublic('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX'));
+      // assert(peerplays.privateToPublic('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX') === TEST_PUBLIC_KEY, 'Mismatched public key');
+      done();
+    });
+  });
 
-  // TODO: not working out of box for mainnet
-  // it('defaultDecimals', done => {
-  //   new Promise(async () => {
-  //     let x = await peerplays.defaultDecimals('1.3.0');
-  //     console.log('RESULT', x);
-  //     assert(x === 5, 'invalid decimal count');
-  //     done();
-  //   });
-  // });
 
-  // TODO: not working out of box for mainnet
-  // it('defaultToken()', done => {
-  //   new Promise(async () => {
-  //     let x = await peerplays.defaultToken();
-  //     console.log('RESULT', x);
-  //     done();
-  //   });
-  // });
+  it('defaultDecimals', done => {
+    new Promise(async () => {
+      let x = await peerplays.defaultDecimals('1.3.0');
+      console.log('RESULT', x);
+      assert(typeof x === 'number', 'invalid decimal count');
+      done();
+    });
+  });
+
+  it('defaultToken()', done => {
+    new Promise(async () => {
+      let x = await peerplays.defaultToken();
+      console.log('RESULT', x);
+      done();
+    });
+  });
 
   it('isValidRecipient()', done => {
     new Promise(async () => {
@@ -100,25 +88,35 @@ describe('peerplays', () => {
     });
   });
 
-  const TEST_KEY = '5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX';
-  const TEST_PUBLIC_KEY = 'TEST6UdzJXcRwdRCfsV5tYGWzmMs5CvPnKqymTX1DkhFQdFFUmizBA';
-
-  // TODO: not working out of box for mainnet
-  // it('should convert a private key to a public key', done => {
-  //   new Promise(async () => {
-  //     assert(peerplays.privateToPublic(TEST_KEY) === TEST_PUBLIC_KEY, 'Bad public key');
-  //     // console.log('privateToPublic result', peerplays.privateToPublic('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX'));
-  //     // assert(peerplays.privateToPublic('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX') === TEST_PUBLIC_KEY, 'Mismatched public key');
-  //     done();
-  //   });
-  // });
-
   it('should check if a private key is valid', done => {
     new Promise(async () => {
       assert(peerplays.validPrivateKey(TEST_KEY), 'Bad private key checker 1');
       // assert(!peerplays.validPrivateKey('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX'), 'Bad private key checker 2');
       done();
     });
+  });
+
+  it('should check if a public key is valid', done => {
+    new Promise(async () => {
+      assert(peerplays.validPublicKey(TEST_PUBLIC_KEY, prefix), 'Bad public key checker [1]');
+      done();
+    })
+});
+
+  it('should convert a private key to a buffer', done => {
+      new Promise(async () => {
+        const bufKey = peerplays.hexPrivateToBuffer(TEST_KEY);
+        assert(Buffer.isBuffer(bufKey), 'Bad buffer key');
+        done();
+      })
+  });
+	
+  it('should convert a buffer to a private key', done => {
+      new Promise(async () => {
+        const buffer = peerplays.hexPrivateToBuffer(TEST_KEY);
+        assert(peerplays.bufferToHexPrivate(buffer) === TEST_KEY, 'Bad buffer key conversion');
+        done();
+      })
   });
 
   it('should be able to retrieve a Peerplays accounts keys', async () => {
