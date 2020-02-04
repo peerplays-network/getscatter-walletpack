@@ -1,5 +1,5 @@
 'use strict';
-import { assert, should, expect } from 'chai';
+import { assert } from 'chai';
 require('isomorphic-fetch');
 import Account from '@walletpack/core/lib/models/Account';
 import Network from '@walletpack/core/lib/models/Network';
