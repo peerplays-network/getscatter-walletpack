@@ -148,10 +148,22 @@ describe('peerplays', () => {
       charset: 'alphanumeric',
     });
 
-    console.log(
-      `Testing registration with following data: \nusername: ${username} \npassword: ${password}`
-    );
+    // console.log(
+    //   `Testing registration with following data: \nusername: ${username} \npassword: ${password}`
+    // );
 
     assert.typeOf(await peerplays.register(1, username, password), 'object');
+  });
+
+  it('should successfully build a transfer transaction object', async () => {
+    const from = 'init0';
+    const to = 'init1';
+    const amount = 10000;
+    const memo = '';
+    const asset = '1.3.0';
+
+    // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
+    const transaction = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
+    assert(transaction.fee.amount > 0);
   });
 });

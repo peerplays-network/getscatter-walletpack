@@ -13,8 +13,19 @@ import SigningService from '@walletpack/core/services/secure/SigningService';
 import ecc from 'eosjs-ecc';
 import Immutable from 'immutable';
 import BigNumber from 'bignumber.js';
-import { PublicKey, ChainValidation, ChainStore, Login, Apis } from 'peerplaysjs-lib';
 const fetch = require('node-fetch');
+
+import {
+  Aes,
+  Apis,
+  ChainValidation,
+  ChainStore,
+  Login,
+  ops,
+  PublicKey,
+  TransactionBuilder,
+  TransactionHelper
+} from 'peerplaysjs-lib';
 
 //TO-DO: Replace with Peerplays explorer.
 const EXPLORER = {
@@ -172,98 +183,6 @@ export default class PPY extends Plugin {
     return payload.transaction.participants;
   }
 
-  init() {
-    Apis.instance(network.fullhost(), true).init_promise.then(res => {
-      // this.connectionStatusCallback(true);
-      // Print out which blockchain we are connecting to
-      console.log('Connected to:', res[0] ? res[0].network_name : 'Undefined Blockchain');
-
-      ChainStore.init()
-        .then(() => {
-          console.log('Chainstore initialized');
-        })
-        .catch(err => {
-          console.error('error: ', err);
-        });
-    });
-  }
-
-  callBlockchainApi(apiPluginName, methodName, params = []) {
-    let apiPlugin;
-
-    if (apiPluginName === 'db_api') {
-      apiPlugin = Apis.instance().db_api();
-
-      return apiPlugin
-        .exec(methodName, params)
-        .then(result => {
-          return Immutable.fromJS(result);
-        })
-        .catch(err => {
-          // Intercept and log
-          log.error(
-            `Error in calling ${apiPluginName}\nMethod: ${methodName}\nParams: ${JSON.stringify(
-              params
-            )}\nError: `,
-            err
-          );
-          // Return an empty response rather than throwing an error.
-          return Immutable.fromJS({});
-        });
-    }
-  }
-
-  callBlockchainDbApi(methodName, params = []) {
-    return this.callBlockchainApi('db_api', methodName, params);
-  }
-
-  /**
-   * Requests a users' public keys from the Peerplays blockchain.
-   * Keys are returned as an array with key order of owner, active, then memo.
-   *
-   * @param {String} accountNameOrId - ie: 'mcs' || '1.2.26'
-   * @returns {Array} keys - [ownerPublicKey, activePublicKey, memoPublicKey]
-   */
-
-  async getAsset(assetID) {
-    if (!assetID) {
-      throw new Error('getAsset: Missing inputs');
-    }
-    let response = await fetch(endpoint, {
-      body: `{\"method\": \"call\", \"params\": [\"database\", \"${methods.GET_ASSET}\", [[\"${assetID}\"]]], \"jsonrpc\": \"2.0\", \"id\": 1}`,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      method: 'POST',
-    });
-    let parsedRes = await response.json();
-    // console.log(parsedRes.result[0])
-    return parsedRes.result[0];
-  }
-
-  /***
-   * Gets a single token's balance.
-   * Returns a Token class where `token.amount` is the balance.
-   */
-  async balanceFor(account, token) {
-    let fullAccount = await this.getFullAccount(account.name);
-    let unformattedBalance;
-    let assetId = '1.3.0';
-
-    if (token.symbol.toUpperCase() === 'PPY') {
-      assetId = '1.3.0';
-    } else if (token.symbol.toUpperCase() === 'BTF') {
-      assetId = '1.3.1';
-    }
-    const assetIndex = fullAccount.balances.findIndex(asset => asset.asset_type === assetId);
-    unformattedBalance = fullAccount.balances[assetIndex].balance;
-    const balance =
-      new BigNumber(unformattedBalance) / Math.pow(10, await this.defaultDecimals(assetId));
-    const clone = token.clone();
-    clone.amount = balance;
-    return clone;
-  }
-
   /***
    * Gets an array of token's values.
    * The `tokens` param might also be omitted which would mean to grab "all available tokens for an account".
@@ -301,45 +220,27 @@ export default class PPY extends Plugin {
     return tokenArray;
   }
 
-  async transfer({ account, to, amount, token, memo, promptForSignature = true }) {
-    if (!this.isValidRecipient(to)) return { error: 'Invalid recipient account name' };
-    amount = parseFloat(amount).toFixed(token.decimals);
-    const { contract, symbol } = token;
-    const amountWithSymbol = amount.indexOf(symbol) > -1 ? amount : `${amount} ${symbol}`;
+  /***
+   * Gets a single token's balance.
+   * Returns a Token class where `token.amount` is the balance.
+   */
+  async balanceFor(account, token) {
+    let fullAccount = await this.getFullAccount(account.name);
+    let unformattedBalance;
+    let assetId = '1.3.0';
 
-    return new Promise(async (resolve, reject) => {
-      const eos = this.getSignableEosjs(account, reject, promptForSignature);
-
-      const result = await eos
-        .transact(
-          {
-            actions: [
-              {
-                account: contract,
-                name: 'transfer',
-                authorization: [
-                  {
-                    actor: account.sendable(),
-                    permission: account.authority,
-                  },
-                ],
-                data: {
-                  from: account.name,
-                  to,
-                  quantity: amountWithSymbol,
-                  memo: memo,
-                },
-              },
-            ],
-          },
-          {
-            blocksBehind: 3,
-            expireSeconds: 30,
-          }
-        )
-        .catch(res => resolve({ error: popupError(res) }))
-        .then(result => resolve(result));
-    });
+    if (token.symbol.toUpperCase() === 'PPY') {
+      assetId = '1.3.0';
+    } else if (token.symbol.toUpperCase() === 'BTF') {
+      assetId = '1.3.1';
+    }
+    const assetIndex = fullAccount.balances.findIndex(asset => asset.asset_type === assetId);
+    unformattedBalance = fullAccount.balances[assetIndex].balance;
+    const balance =
+      new BigNumber(unformattedBalance) / Math.pow(10, await this.defaultDecimals(assetId));
+    const clone = token.clone();
+    clone.amount = balance;
+    return clone;
   }
 
   async signer(payload, publicKey, arbitrary = false, isHash = false, privateKey = null) {
@@ -391,6 +292,340 @@ export default class PPY extends Plugin {
   }
 
   /**
+   * Fetch the Peerplays blockchain for data.
+   *
+   * @param {String} method - The method associated with the request to be made.
+   * @param {Array} params - The parameters associated with the method.
+   * @returns {*} - The data from the request OR an error if there is one.
+   * @memberof PPY
+   */
+  async _callChain(method, params) {
+    const fetchBody = JSON.stringify({
+      "method": "call",
+      "params": [
+        "database",
+        method,
+        params
+      ],
+      "jsonrpc": "2.0",
+      "id": 1
+    });
+
+    return await fetch(MAINNET_ENDPOINT_1, {
+      body: fetchBody,
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-type': 'application/json'
+      }
+    }).catch(err => {
+      throw new Error(err);
+    }).then(res => res.json()).then(res => res.result);
+  }
+
+  /**
+   * Retrieve the asset information from the Peerplays chain.
+   *
+   * @param {String} assetID - The asset id to request information for ie: '1.3.0'.
+   * @returns
+   * @memberof PPY
+   */
+  async getAsset(assetID) {
+    if (!assetID) {
+      throw new Error('getAsset: Missing inputs');
+    }
+    const res = await this._callChain(methods.GET_ASSET, [[assetID]]);
+    return res[0];
+  }
+
+  /**
+   * Returns data objects from chain for provided array of object ids.
+   * this.getObject(['1.3.0'])
+   *
+   * @param {Array} objIds - The list of ids to retrieve data from the Peerplays chain.
+   * @returns {Array} - An array of the objects requested.
+   * @memberof PPY
+   */
+  async getObjects(objIds) {
+    if (!objIds || objIds.length === 0) {
+      throw new Error('getObjects: Missing inputs');
+    }
+    return await this._callChain(methods.GET_OBJECTS, [objIds]);
+  }
+
+  /**
+   * Requests from Peerplays blockchain for account data object.
+   *
+   * @param {String} accountNameOrId - The Peerplays account username to request data for.
+   * @returns {Object}
+   * @memberof PPY
+   */
+  async getFullAccount(accountNameOrId) {
+    if (!accountNameOrId) {
+      throw new Error('getFullAccount: Missing input');
+    }
+    const res = await this._callChain(methods.GET_FULL_ACCOUNTS, [[accountNameOrId], true]);
+    return res[0][1].account;
+  }
+
+  /**
+   * Used by setRequiredFees.
+   *
+   * @param {Array} ops - The operations within a TransactionBuilder instance.
+   * @param {String} assetId - The id of the asset to use ie: '1.3.0'.
+   * @returns {Array} - An array of objects containing the fees associated with the provided `ops`.
+   * @memberof PPY
+   */
+  async getRequiredFees(ops, assetId) {
+    if (!ops || !assetId) {
+      throw new Error('getRequiredFees: Missing inputs');
+    }
+    return await this._callChain(methods.GET_REQUIRED_FEES, [[ops], assetId]);
+  }
+
+  /**
+   * By providing a transaction builder instance transaction and the asset to use for the fees, this function will
+   * return the fees associated with all operations within said transaction object instance.
+   *
+   * @param {String} assetId
+   * @param {Object} tr - The instance of TransactionBuilder associated with the transaction requiring fees to be set.
+   * @returns {Object} - The transaction that was passed in with the fees set on the operations within it.
+   * @memberof PPY
+   */
+  async setRequiredFees(assetId, tr) {
+    if (!tr.operations) {
+      throw new Error('setRequiredFees: transaction has no operations');
+    }
+
+    let feePool;
+    let operations = [];
+
+    for (let i = 0, len = tr.operations.length; i < len; i++) {
+      let op = tr.operations[i];
+      operations.push(ops.operation.toObject(op)); // serialize with peerplaysjs-lib
+    }
+
+    if (!assetId) {
+      let op1_fee = operations[0][1].fee;
+
+      if (op1_fee && op1_fee.asset_id !== null) {
+        assetId = op1_fee.asset_id;
+      } else {
+        assetId = '1.3.0';
+      }
+    }
+
+    let promises = [await this.getRequiredFees(operations, assetId)];
+
+    if (assetId !== '1.3.0') {
+      // This handles the fallback to paying fees in BTS if the fee pool is empty.
+      promises.push(await this.getRequiredFees(operations, '1.3.0'));
+      promises.push(await this.getObjects('1.3.0'));
+    }
+
+    return Promise.all(promises).then(res => {
+      let [fees, coreFees, asset] = res,
+        dynamicPromise;
+      asset = asset ? asset[0] : null;
+
+      dynamicPromise =
+        assetId !== '1.3.0' && asset
+          ? this.getObjects(asset.dynamic_asset_data_id)
+          : new Promise(resolve => resolve());
+
+      return dynamicPromise.then(dynamicObject => {
+        if (assetId !== '1.3.0') {
+          feePool = dynamicObject ? dynamicObject[0].fee_pool : 0;
+          let totalFees = 0;
+
+          for (let j = 0, fee; j < coreFees.length; j++) {
+            fee = coreFees[j];
+            totalFees += fee.amount;
+          }
+
+          if (totalFees > parseInt(fee_pool, 10)) {
+            fees = coreFees;
+            assetId = '1.3.0';
+          }
+        }
+
+        // Proposed transactions need to be flattened
+        let flatAssets = [];
+
+        let flatten = obj => {
+          if (Array.isArray(obj)) {
+            for (let k = 0, len = obj.length; k < len; k++) {
+              let item = obj[k];
+              flatten(item);
+            }
+          } else {
+            flatAssets.push(obj);
+          }
+        };
+
+        flatten(fees);
+
+        let assetIndex = 0;
+
+        let setFee = operation => {
+          if (
+            !operation.fee ||
+            operation.fee.amount === 0 ||
+            (operation.fee.amount.toString && operation.fee.amount.toString() === '0') // Long
+          ) {
+            operation.fee = flatAssets[assetIndex];
+          }
+
+          assetIndex++;
+
+          if (operation.proposed_ops) {
+            let result = [];
+
+            for (let y = 0; y < operation.proposed_ops.length; y++) {
+              result.push(set_fee(operation.proposed_ops[y].op[1]));
+            }
+
+            return result;
+          }
+        };
+
+        for (let i = 0; i < operations.length; i++) {
+          setFee(operations[i][1]);
+        }
+
+        return operations[0][1];
+      });
+    });
+  }
+
+  /**
+   * TODO: incomplete. Need to handle getting sig
+   * Construct a transaction for a transfer operation with correct fees.
+   *
+   * @param {Object} args - Required params for the construction of the transaction and its operations.
+   * @param {String} from - The sending Peerplays account name.
+   * @param {String} to - The recipient Peerplays account name.
+   * @param {Number} amount - The numerical amount of funds to send to the recipient.
+   * @param {String} memo - The optional message to send along with the funds being transferred.
+   * @param {String} asset - The Peerplays asset (User Issued Asset token) id associated with the transfer.
+   * @param {String} proposeAccount - Optional, default null. The Peerplays account name to be proposed.
+   * @param {Boolean} encryptMemo - Optional, default true. Whether or not to encrypt the memo.
+   *
+   * @returns {Object} - A TransactionBuilder transaction instance with fees set on the transaction for a transfer operation.
+   * @memberof PPY
+   */
+  async getTransferTransaction(from, to, amount, memo, asset, proposeAccount = null, encryptMemo = true) {
+    let feeAssetId = asset;
+    if (!from || !to || !amount || !asset) {
+      throw new Error('transfer: Missing inputs');
+    }
+
+    // TODO ============================================== // TODO
+    // ------ get the memo private key from scatter ------//
+    // const memoPrivateKey = PrivateKey.fromBuffer(memoPrivateKeyBuffer);
+    // const memoPublicKey = memoPrivateKey.toPublicKey().toPublicKeyString();
+    // TODO ============================================== // TODO
+
+    let memoToPublicKey;
+    // get account data for `from`, `to`, & `proposeAccount`
+    const [chainFrom, chainTo] = [await this.getFullAccount(from), await this.getFullAccount(to)];
+    const chainProposeAccount = proposeAccount && (await this.getFullAccount(proposeAccount));
+
+    // get asset data
+    let chainAsset = await this.getAsset(asset);
+
+    //====================================================================================================
+    // console.log(chainFrom, chainTo, chainProposeAccount);
+    // console.log(chainAsset, chainFeeAsset);
+    // console.log(chainTo.active.key_auths[0][0]);
+
+    // If we have a non-empty string memo and are configured to encrypt...
+    if (memo && encryptMemo) {
+      memoToPublicKey = chainTo.options.memo_key;
+
+      // Check for a null memo key, if the memo key is null use the receivers active key
+      if (/PPY1111111111111111111111111111111114T1Anm/.test(memoToPublicKey)) {
+        memoToPublicKey = chainTo.active.key_auths[0][0];
+      }
+    }
+
+    let proposeAcountId = proposeAccount ? chainProposeAccount.id : null;
+    let memoObject;
+
+    //=======================================
+    const username = 'sample'
+    const pw = 'sample-password'
+    const { privKeys, pubKeys } = Login.generateKeys(username, pw, roles, PREFIX); // TODO: use stored keys passed from scatter encrypted key storage
+    // console.log(privKeys, pubKeys)
+    // memoToPublicKey = '';
+    const memoPrivateKey = privKeys.memo;
+    const memoPublicKey = pubKeys.memo;
+    //=======================================
+    if (memo && memoToPublicKey && memoPublicKey) {
+      let nonce = optional_nonce == null ? TransactionHelper.unique_nonce_uint64() : optional_nonce;
+
+      memoObject = {
+        from: memoPublicKey, // From Public Key
+        to: memoToPublicKey, // To Public Key
+        nonce,
+        message: encryptMemo
+          ? Aes.encrypt_with_checksum(
+              memoPrivateKey, // From Private Key
+              memoToPublicKey, // To Public Key
+              nonce,
+              memo
+            )
+          : Buffer.isBuffer(memo)
+          ? memo.toString('utf-8')
+          : memo,
+      };
+    }
+
+    // console.log(memo_object) =============================================================
+
+    // Allow user to choose asset with which to pay fees
+    let feeAsset = chainAsset;
+
+    // Default to CORE in case of faulty core_exchange_rate
+    if (
+      feeAsset.options.core_exchange_rate.base.asset_id === '1.3.0' &&
+      feeAsset.options.core_exchange_rate.quote.asset_id === '1.3.0'
+    ) {
+      feeAssetId = '1.3.0';
+    }
+
+    let tr = new TransactionBuilder();
+
+    let transferOp = tr.get_type_operation('transfer', {
+      fee: {
+        amount: 0,
+        asset_id: feeAssetId,
+      },
+      from: chainFrom.id,
+      to: chainTo.id,
+      amount: {
+        amount,
+        asset_id: chainAsset.id,
+      },
+      memo: memoObject,
+    });
+
+    if (proposeAccount) {
+      let proposalCreateOp = tr.get_type_operation('proposal_create', {
+        proposed_ops: [{ op: transferOp }],
+        fee_paying_account: proposeAcountId,
+      });
+      tr.add_operation(proposalCreateOp);
+      tr.operations[0][1].expiration_time = parseInt(Date.now() / 1000 + 5);
+    } else {
+      tr.add_operation(transferOp);
+    }
+
+    // Set the transaction fees for the new transaction
+    return await this.setRequiredFees('1.3.0', tr).then(tr => tr);
+  }
+
+  /**
    * Requests a users' public keys from the Peerplays blockchain.
    * Keys are returned as an array with key order of owner, active, then memo.
    *
@@ -413,6 +648,20 @@ export default class PPY extends Plugin {
     });
 
     return keys;
+  }
+
+  /**
+   * Perform transfer...
+   * TODO: ensure returns expected
+   *
+   * @param {{from: String, to: String, amount: Number, memo: String, token: String, promptForSignature: Boolean}}
+   * @memberof PPY
+   */
+  async transfer({from, to, amount, memo, token, promptForSignature = true}) {
+    const asset = token;
+    // Get the transaction
+    const transferTransaction = await this.getTransferTransaction(from, to, amount, memo, asset);
+    // return ???
   }
 
   /**
@@ -440,31 +689,6 @@ export default class PPY extends Plugin {
     const authed = Login.checkKeys(user, prefix);
 
     return authed;
-  }
-
-  /**
-   * Requests from Peerplays blockchain for account data object.
-   *
-   * @param {String} accountNameOrId - The Peerplays account username to request data for.
-   * @returns {Object}
-   * @memberof PPY
-   */
-  async getFullAccount(accountNameOrId) {
-    let response = await fetch(MAINNET_ENDPOINT_1, {
-      body: `{\"method\": \"call\", \"params\": [\"database\", \"${methods.GET_FULL_ACCOUNTS}\", [[\"${accountNameOrId}\"], true]], \"jsonrpc\": \"2.0\", \"id\": 1}`,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      method: 'POST',
-    });
-
-    let parsedRes = await response.json();
-
-    if (parsedRes && parsedRes.result.length === 0) {
-      throw new Error('getFullAccount: No account found');
-    }
-
-    return parsedRes.result[0][1].account;
   }
 
   /**
@@ -513,6 +737,7 @@ export default class PPY extends Plugin {
       },
     });
 
+    // We use a separate fetch here as we want this to potentially have multiple tries.
     return await fetch(MAINNET_FAUCET, {
       method: 'post',
       mode: 'cors',
