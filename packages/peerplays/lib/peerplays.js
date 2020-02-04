@@ -14,7 +14,7 @@ import ecc from 'eosjs-ecc';
 import Immutable from 'immutable';
 import BigNumber from 'bignumber.js';
 import { PublicKey, ChainValidation, ChainStore, Login, Apis } from 'peerplaysjs-lib';
-const fetch = require("node-fetch");
+const fetch = require('node-fetch');
 
 //TO-DO: Replace with Peerplays explorer.
 const EXPLORER = {
@@ -38,7 +38,7 @@ const roles = ['owner', 'active', 'memo'];
 const MAINNET_CHAIN_ID = '6b6b5f0ce7a36d323768e534f3edb41c6d6332a541a95725b98e28d140850134'; // alice
 const TESTNET_CHAIN_ID = 'b3f7fe1e5ad0d2deca40a626a4404524f78e65c3a48137551c33ea4e7c365672'; // beatrice
 
-const MAINNET_ENDPOINT_1 = 'https://pma.blockveritas.co/ws'
+const MAINNET_ENDPOINT_1 = 'https://pma.blockveritas.co/ws';
 const MAINNET_FAUCET = 'https://faucet.peerplays.download/faucet';
 const PREFIX = 'PPY';
 
@@ -225,21 +225,21 @@ export default class PPY extends Plugin {
    * @returns {Array} keys - [ownerPublicKey, activePublicKey, memoPublicKey]
    */
 
-	async getAsset(assetID) {
-		if (!assetID) {
-		  throw new Error('getAsset: Missing inputs');
-		}
-		let response = await fetch(endpoint, {
-		  body: `{\"method\": \"call\", \"params\": [\"database\", \"${methods.GET_ASSET}\", [[\"${assetID}\"]]], \"jsonrpc\": \"2.0\", \"id\": 1}`,
-		  headers: {
-			'Content-Type': 'application/x-www-form-urlencoded',
-		  },
-		  method: 'POST',
-		});
-		let parsedRes = await response.json();
-		// console.log(parsedRes.result[0])
-		return parsedRes.result[0];
-	  }
+  async getAsset(assetID) {
+    if (!assetID) {
+      throw new Error('getAsset: Missing inputs');
+    }
+    let response = await fetch(endpoint, {
+      body: `{\"method\": \"call\", \"params\": [\"database\", \"${methods.GET_ASSET}\", [[\"${assetID}\"]]], \"jsonrpc\": \"2.0\", \"id\": 1}`,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      method: 'POST',
+    });
+    let parsedRes = await response.json();
+    // console.log(parsedRes.result[0])
+    return parsedRes.result[0];
+  }
 
   /***
    * Gets a single token's balance.
@@ -257,7 +257,8 @@ export default class PPY extends Plugin {
     }
     const assetIndex = fullAccount.balances.findIndex(asset => asset.asset_type === assetId);
     unformattedBalance = fullAccount.balances[assetIndex].balance;
-    const balance = new BigNumber(unformattedBalance) / Math.pow(10, await this.defaultDecimals(assetId));
+    const balance =
+      new BigNumber(unformattedBalance) / Math.pow(10, await this.defaultDecimals(assetId));
     const clone = token.clone();
     clone.amount = balance;
     return clone;
@@ -274,7 +275,7 @@ export default class PPY extends Plugin {
     let tokenArray = [];
     let assetId = '1.3.0';
 
-    tokens.map(async (token) => {
+    tokens.map(async token => {
       const t = token.clone();
       const symbol = token.symbol.toUpperCase();
 
@@ -291,7 +292,8 @@ export default class PPY extends Plugin {
       }
 
       unformattedBalance = fullAccount.balances[assetIndex].balance;
-      const balance = new BigNumber(unformattedBalance) / Math.pow(10, await this.defaultDecimals(assetId));
+      const balance =
+        new BigNumber(unformattedBalance) / Math.pow(10, await this.defaultDecimals(assetId));
       t.amount = balance;
       tokenArray.push(t);
     });

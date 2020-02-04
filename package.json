@@ -11,7 +11,13 @@
     "test:ppy": "mocha ./packages/peerplays/__tests__/**/*.test.js --require @babel/register --require @babel/polyfill --exit --timeout 1000000",
     "pack": "webpack-cli --mode=production --display-error-details"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@walletpack/bitcoin": "^1.0.44",
+    "@walletpack/core": "^1.0.41",
+    "@walletpack/eosio": "0.0.50",
+    "@walletpack/ethereum": "0.0.48",
+    "@walletpack/tron": "0.0.50"
+  },
   "devDependencies": {
     "@babel/cli": "^7.4.4",
     "@babel/core": "^7.6.4",
