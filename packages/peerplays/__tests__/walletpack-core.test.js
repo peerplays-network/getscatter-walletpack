@@ -44,7 +44,7 @@ const token = Token.fromJson({
 account.network = () => network;
 account.sendable = () => account.publicKey;
 
-describe('peerplays', () => {
+describe('peerplays core', () => {
   const TEST_KEY = '5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX';
   const TEST_PUBLIC_KEY = 'TEST6UdzJXcRwdRCfsV5tYGWzmMs5CvPnKqymTX1DkhFQdFFUmizBA';
 
