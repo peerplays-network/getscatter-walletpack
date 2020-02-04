@@ -52,16 +52,6 @@ describe('peerplays', () => {
   const TEST_KEY = '5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX';
   const TEST_PUBLIC_KEY = 'TEST6UdzJXcRwdRCfsV5tYGWzmMs5CvPnKqymTX1DkhFQdFFUmizBA';
 
-  it('should convert a private key to a public key', done => {
-    new Promise(async () => {
-      assert(peerplays.privateToPublic(TEST_KEY, prefix) === TEST_PUBLIC_KEY, 'Bad public key'); // Prefix TEST on testnets
-      // console.log('privateToPublic result', peerplays.privateToPublic('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX'));
-      // assert(peerplays.privateToPublic('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX') === TEST_PUBLIC_KEY, 'Mismatched public key');
-      done();
-    });
-  });
-
-
   it('defaultDecimals', done => {
     new Promise(async () => {
       let x = await peerplays.defaultDecimals('1.3.0');
@@ -84,6 +74,35 @@ describe('peerplays', () => {
       let x = await peerplays.isValidRecipient('init1');
       console.log('RESULT', x);
       assert(x === true, 'recipient invalid name');
+      done();
+    });
+  });
+
+
+  it('should check return a properly formatted account', done => {
+    new Promise(async () => {
+      const account = Account.fromJson({
+        name:'test',
+      })
+        assert(peerplays.accountFormatter(account) === 'test', 'Bad account formatter');
+        done();
+    })
+  });
+
+  it('should get the endorsed network', done => {
+      new Promise(async () => {
+        const network = peerplays.getEndorsedNetwork();
+        assert(network && network.blockchain === Blockchains.PPY, 'Bad endorsed network');
+        assert(peerplays.isEndorsedNetwork(network), 'Bad endorsed network check');
+        done();
+      })
+  });
+
+  it('should convert a private key to a public key', done => {
+    new Promise(async () => {
+      assert(peerplays.privateToPublic(TEST_KEY, prefix) === TEST_PUBLIC_KEY, 'Bad public key'); // Prefix TEST on testnets
+      // console.log('privateToPublic result', peerplays.privateToPublic('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX'));
+      // assert(peerplays.privateToPublic('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX') === TEST_PUBLIC_KEY, 'Mismatched public key');
       done();
     });
   });

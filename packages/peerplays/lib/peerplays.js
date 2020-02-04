@@ -63,7 +63,7 @@ export default class PPY extends Plugin {
   }
 
   accountFormatter(account) {
-    return `${account.publicKey}`;
+    return account.name;
   }
 
   returnableAccount(account) {
