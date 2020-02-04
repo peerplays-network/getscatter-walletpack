@@ -1,8 +1,12 @@
 {
   "name": "@walletpack/peerplays",
   "version": "0.0.42",
-  "description": "> TODO: description",
+  "description": "Peerplays Plugin for use within GetScatter",
   "author": "GetScatter Ltd. 2019",
+  "contributors": [
+    "Justin Cheung <j.cheung@pbsa.info> (https://github.com/MuffinLightning)",
+    "Michael Seaward <m.seaward@mamok.in> (https://mamok.in/)"
+  ],
   "homepage": "",
   "license": "ISC",
   "main": "peerplays.js",
@@ -17,7 +21,6 @@
   "dependencies": {
     "@walletpack/core": "^1.0.33",
     "eosjs-ecc": "^4.0.7",
-    "immutable": "^4.0.0-rc.12",
     "node-fetch": "^2.6.0",
     "peerplaysjs-lib": "peerplays-network/peerplaysjs-lib#release/v0.6.6-alpha",
     "randomstring": "^1.1.5"

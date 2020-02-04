@@ -11,7 +11,6 @@ import TokenService from '@walletpack/core/services/utility/TokenService';
 import EventService from '@walletpack/core/services/utility/EventService';
 import SigningService from '@walletpack/core/services/secure/SigningService';
 import ecc from 'eosjs-ecc';
-import Immutable from 'immutable';
 import BigNumber from 'bignumber.js';
 const fetch = require('node-fetch');
 
