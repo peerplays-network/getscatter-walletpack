@@ -22,6 +22,7 @@ import {
   Login,
   ops,
   PublicKey,
+  PrivateKey as Pkey,
   TransactionBuilder,
   TransactionHelper
 } from 'peerplaysjs-lib';
@@ -73,7 +74,7 @@ export default class PPY extends Plugin {
   }
 
   accountFormatter(account) {
-    return `${account.publicKey}`;
+    return account.name;
   }
 
   returnableAccount(account) {
@@ -132,10 +133,7 @@ export default class PPY extends Plugin {
   }
 
   privateToPublic(privateKey, prefix = null) {
-    return ecc
-      .PrivateKey(privateKey)
-      .toPublic()
-      .toString(prefix ? prefix : 'PPY');
+    return Pkey.fromWif(privateKey).toPublicKey().toString(prefix ? prefix : 'PPY');
   }
 
   validPrivateKey(privateKey) {
@@ -151,11 +149,12 @@ export default class PPY extends Plugin {
   }
 
   bufferToHexPrivate(buffer) {
-    return ecc.PrivateKey.fromBuffer(Buffer.from(buffer)).toString();
+    const bufKey = Pkey.fromBuffer(Buffer.from(buffer))
+    return bufKey.toWif();
   }
 
   hexPrivateToBuffer(privateKey) {
-    return new ecc.PrivateKey(privateKey).toBuffer();
+    return new Pkey.fromWif(privateKey).toBuffer();
   }
 
   hasUntouchableTokens() {
@@ -513,7 +512,7 @@ export default class PPY extends Plugin {
    * @returns {Object} - A TransactionBuilder transaction instance with fees set on the transaction for a transfer operation.
    * @memberof PPY
    */
-  async getTransferTransaction(from, to, amount, memo, asset, proposeAccount = null, encryptMemo = true) {
+  async getTransferTransaction(from, to, amount, memo, asset, proposeAccount = null, encryptMemo = true, optional_nonce = null) {
     let feeAssetId = asset;
     if (!from || !to || !amount || !asset) {
       throw new Error('transfer: Missing inputs');
