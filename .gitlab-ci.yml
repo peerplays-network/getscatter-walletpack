@@ -15,11 +15,11 @@ build:
   image: node:10
   stage: test
   script:
-    - cd ~/getscatter-walletpack/packages/eosio
+    - cd /builds/PBSA/scatterwallet/getscatter-walletpack/packages/eosio
     - npm install
-    - cd ~/getscatter-walletpack/packages/tron
+    - cd /builds/PBSA/scatterwallet/getscatter-walletpack/packages/tron
     - npm install
-    - cd ~/getscatter-walletpack
+    - cd /builds/PBSA/scatterwallet/getscatter-walletpack
     - npm ci
     - npm run build
     - npm run test
