@@ -94,15 +94,6 @@ describe('peerplays core', () => {
       })
   });
 
-  it('should convert a private key to a public key', done => {
-    new Promise(async () => {
-      assert(peerplays.privateToPublic(TEST_KEY, prefix) === TEST_PUBLIC_KEY, 'Bad public key'); // Prefix TEST on testnets
-      // console.log('privateToPublic result', peerplays.privateToPublic('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX'));
-      // assert(peerplays.privateToPublic('5KTyQ6kq2faYWzgVpLMCAkb97npLySCFk1KDa57tgZScUge2BYX') === TEST_PUBLIC_KEY, 'Mismatched public key');
-      done();
-    });
-  });
-
   it('should check if a private key is valid', done => {
     new Promise(async () => {
       assert(peerplays.validPrivateKey(TEST_KEY), 'Bad private key checker 1');

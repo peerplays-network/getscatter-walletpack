@@ -1,8 +1,5 @@
 'use strict';
 import { assert } from 'chai';
-import Keypair from '@walletpack/core/models/Keypair';
-import { Blockchains } from '@walletpack/core/models/Blockchains';
-import { PrivateKey as Pkey } from 'peerplaysjs-lib';
 require('isomorphic-fetch');
 
 const peerplays = new (require('../lib/peerplays').default)();
@@ -21,24 +18,27 @@ const mainnetTester = {
     owner: 'PPY4yaEWqYHxR8QxrFFFpVwYSgzNaMUVmiNgCwM31WPbjNPDUrKqn',
     active: 'PPY8QGhjBytYZrHpmDorLM4ETsoDYXGbGH3WT8sTrhu3LUJQ9ePf5',
     memo: 'PPY64uMTGiYZQkn5P7dy87fnfVz68b4HYEBRTK1bc3wqEVTcp2GtB'
-  }
+  },
+  prefix: 'PPY'
 };
 
-const roles = ['owner','active','memo'];
+const TESTING_ACCOUNT = mainnetTester;
 
+// TODO: remove?
 // account keys for 'unit39'
-const KEYPAIR = Keypair.fromJson({
-  privateKey: mainnetTester.wifs.active,
-  blockchains: [Blockchains.PPY],
-  publicKeys: [{
-    key: 'PPY8QGhjBytYZrHpmDorLM4ETsoDYXGbGH3WT8sTrhu3LUJQ9ePf5', // active
-    blockchain: Blockchains.PPY
-  }]
-});
+// const KEYPAIR = Keypair.fromJson({
+//   privateKey: mainnetTester.wifs.active,
+//   blockchains: [Blockchains.PPY],
+//   publicKeys: [{
+//     key: 'PPY8QGhjBytYZrHpmDorLM4ETsoDYXGbGH3WT8sTrhu3LUJQ9ePf5', // active
+//     blockchain: Blockchains.PPY
+//   }]
+// });
 
 describe('peerplays', () => {
   it('should convert a private key WIF to it\'s public key', async () => {
-    assert.equal(Pkey.fromWif(mainnetTester.wifs.active).toPublicKey().toPublicKeyString(), mainnetTester.pubKeys.active);
+    const [wif, prefix, publicKey] = [TESTING_ACCOUNT.wifs.active, TESTING_ACCOUNT.prefix, TESTING_ACCOUNT.pubKeys.active]
+    assert(peerplays.privateToPublic(wif, prefix) === publicKey, 'Bad public key');
   })
 
   it('should be able to retrieve a Peerplays accounts keys', async () => {
@@ -55,7 +55,7 @@ describe('peerplays', () => {
     assert.equal(await peerplays.authUser(mainnetTester.username, mainnetTester.password), true);
   });
 
-  it.only('should attempt to register a new Peerplays account (ip limit)', async () => {
+  it('should attempt to register a new Peerplays account (ip limit)', async () => {
     const username = RandomString.generate({
       length: 7,
       charset: 'hex',
