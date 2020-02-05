@@ -22,7 +22,8 @@ const mainnetTester = {
   prefix: 'PPY'
 };
 
-const TESTING_ACCOUNT = mainnetTester;
+// If using a non mainnet account, provide account data above and change the assignment below.
+const TESTING_ACCOUNT = mainnetTester; // don't forget to update the endpoint in use in peerplays.js if using a non-mainnet account
 
 // TODO: remove?
 // account keys for 'unit39'
