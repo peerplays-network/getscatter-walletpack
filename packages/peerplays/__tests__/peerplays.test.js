@@ -1,5 +1,5 @@
 'use strict';
-import { assert } from 'chai';
+import { assert, expect } from 'chai';
 require('isomorphic-fetch');
 
 const peerplays = new (require('../lib/peerplays').default)();
@@ -37,9 +37,16 @@ const TESTING_ACCOUNT = mainnetTester; // don't forget to update the endpoint in
 // });
 
 describe('peerplays', () => {
-  it('should convert a private key WIF to it\'s public key', async () => {
+  it('should convert a private key WIF to it\'s public key (privateToPublic)', async () => {
     const [wif, prefix, publicKey] = [TESTING_ACCOUNT.wifs.active, TESTING_ACCOUNT.prefix, TESTING_ACCOUNT.pubKeys.active]
     assert(peerplays.privateToPublic(wif, prefix) === publicKey, 'Bad public key');
+  })
+
+  it('should convert a private key WIF to it\'s PrivateKey counterpart (privateFromWif)', async () => {
+    const ppy = peerplays;
+    const wif = TESTING_ACCOUNT.wifs.active;
+    const pk = peerplays.privateFromWif(wif);
+    assert(ppy.privateToPublic(ppy.wifFromPrivate(pk)) === TESTING_ACCOUNT.pubKeys.active);
   })
 
   it('should be able to retrieve a Peerplays accounts keys', async () => {
@@ -47,7 +54,7 @@ describe('peerplays', () => {
     assert.typeOf(await peerplays.getAccountKeys(username), 'object');
   });
 
-  it('should be able to retrieve a Peerplays account', async () => {
+  it('should be able to retrieve a full Peerplays account', async () => {
     const username = 'init1';
     assert.typeOf(await peerplays.getFullAccount(username), 'object');
   });
@@ -56,7 +63,7 @@ describe('peerplays', () => {
     assert.equal(await peerplays.authUser(mainnetTester.username, mainnetTester.password), true);
   });
 
-  it('should attempt to register a new Peerplays account (ip limit)', async () => {
+  it('should attempt to register a new Peerplays account', async () => {
     const username = RandomString.generate({
       length: 7,
       charset: 'hex',
@@ -84,8 +91,8 @@ describe('peerplays', () => {
     const asset = '1.3.0';
 
     // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
-    const transaction = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
-    assert(transaction.fee.amount > 0);
+    const tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
+    expect(tr.operations[0][1].fee.amount).to.not.be.empty;
   });
 
   it('should successfully build a transfer transaction object with a memo', async () => {
@@ -96,7 +103,20 @@ describe('peerplays', () => {
     const asset = '1.3.0';
 
     // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
-    const transaction = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
-    assert(transaction.fee.amount > 0);
+    const tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
+    expect(tr.operations[0][1].fee.amount).to.not.be.empty;
+  });
+
+  it('should successfully sign a transaction (signer)', async () => {
+    const from = 'init0';
+    const to = 'init1';
+    const amount = 10000;
+    const memo = 'test memo';
+    const asset = '1.3.0';
+    // sample transfer transaction
+    let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
+    tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active));
+
+    assert(tr.signer_private_keys.length > 0);
   });
 });
