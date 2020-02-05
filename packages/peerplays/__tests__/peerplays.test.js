@@ -1,5 +1,8 @@
 'use strict';
 import { assert } from 'chai';
+import Keypair from '@walletpack/core/models/Keypair';
+import { Blockchains } from '@walletpack/core/models/Blockchains';
+import { Login } from 'peerplaysjs-lib';
 require('isomorphic-fetch');
 
 const peerplays = new (require('../lib/peerplays').default)();
