@@ -13,14 +13,12 @@ stages:
 
 build:
   stage: test
-  before_script:
-    - export PATH=/home/gitlab-runner/.nvm/versions/node/$NODE_VERSION/bin:$PATH
   script:
     - npm ci
     - npm run build
     - npm run test
   tags:
-    - pbsa
+    - docker
 
 license_management:
   stage: test
