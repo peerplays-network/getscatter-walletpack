@@ -132,8 +132,16 @@ export default class PPY extends Plugin {
     return ChainValidation.is_account_name(name);
   }
 
-  privateToPublic(privateKey, prefix = null) {
-    return Pkey.fromWif(privateKey).toPublicKey().toString(prefix ? prefix : 'PPY');
+  privateFromWif(privateKeyWif) {
+    return Pkey.fromWif(privateKeyWif);
+  }
+
+  wifFromPrivate(privateKey) {
+    return privateKey.toWif();
+  }
+
+  privateToPublic(privateKeyWif, prefix = null) {
+    return this.privateFromWif(privateKeyWif).toPublicKey().toString(prefix ? prefix : 'PPY');
   }
 
   validPrivateKey(privateKey) {
@@ -241,14 +249,22 @@ export default class PPY extends Plugin {
     return clone;
   }
 
-  async signer(payload, publicKey, arbitrary = false, isHash = false, privateKey = null) {
-    if (!privateKey) privateKey = await KeyPairService.publicToPrivate(publicKey);
-    if (!privateKey) return;
+  async signer(transaction, publicKey, arbitrary = false, isHash = false, privateKey = null) {
+    if (!publicKey && privateKey) {
+      publicKey = this.privateToPublic(privateKey);
+    }
 
-    if (typeof privateKey !== 'string') privateKey = this.bufferToHexPrivate(privateKey);
+    // Sign the Peerplays transaction with private and public key
+    transaction.add_signer(privateKey, publicKey)
+    return transaction;
 
-    if (arbitrary && isHash) return ecc.Signature.signHash(payload.data, privateKey).toString();
-    return ecc.sign(Buffer.from(arbitrary ? payload.data : payload.buf, 'utf8'), privateKey);
+    // if (!privateKey) privateKey = await KeyPairService.publicToPrivate(publicKey);
+    // if (!privateKey) return;
+
+    // if (typeof privateKey !== 'string') privateKey = this.bufferToHexPrivate(privateKey);
+
+    // if (arbitrary && isHash) return ecc.Signature.signHash(payload.data, privateKey).toString();
+    // return ecc.sign(Buffer.from(arbitrary ? payload.data : payload.buf, 'utf8'), privateKey);
   }
 
   async signerWithPopup(payload, account, rejector) {
@@ -491,14 +507,14 @@ export default class PPY extends Plugin {
           setFee(operations[i][1]);
         }
 
-        return operations[0][1];
+        return tr;
       });
     });
   }
 
   /**
-   * TODO: incomplete. Need to handle getting sig
-   * Construct a transaction for a transfer operation with correct fees.
+   * TODO: incomplete
+   * Construct an unsigned transaction for a transfer operation with correct fees.
    *
    * @param {Object} args - Required params for the construction of the transaction and its operations.
    * @param {String} from - The sending Peerplays account name.
@@ -518,24 +534,14 @@ export default class PPY extends Plugin {
       throw new Error('transfer: Missing inputs');
     }
 
-    // TODO ============================================== // TODO
-    // ------ get the memo private key from scatter ------//
-    // const memoPrivateKey = PrivateKey.fromBuffer(memoPrivateKeyBuffer);
-    // const memoPublicKey = memoPrivateKey.toPublicKey().toPublicKeyString();
-    // TODO ============================================== // TODO
-
     let memoToPublicKey;
+
     // get account data for `from`, `to`, & `proposeAccount`
     const [chainFrom, chainTo] = [await this.getFullAccount(from), await this.getFullAccount(to)];
     const chainProposeAccount = proposeAccount && (await this.getFullAccount(proposeAccount));
 
     // get asset data
     let chainAsset = await this.getAsset(asset);
-
-    //====================================================================================================
-    // console.log(chainFrom, chainTo, chainProposeAccount);
-    // console.log(chainAsset, chainFeeAsset);
-    // console.log(chainTo.active.key_auths[0][0]);
 
     // If we have a non-empty string memo and are configured to encrypt...
     if (memo && encryptMemo) {
@@ -550,15 +556,15 @@ export default class PPY extends Plugin {
     let proposeAcountId = proposeAccount ? chainProposeAccount.id : null;
     let memoObject;
 
-    //=======================================
+    //=================================================================
+    // TODO: remove this once we have keys from Scatter to use instead
+    //=================================================================
     const username = 'sample'
     const pw = 'sample-password'
-    const { privKeys, pubKeys } = Login.generateKeys(username, pw, roles, PREFIX); // TODO: use stored keys passed from scatter encrypted key storage
-    // console.log(privKeys, pubKeys)
-    // memoToPublicKey = '';
+    const { privKeys, pubKeys } = Login.generateKeys(username, pw, roles, PREFIX);
     const memoPrivateKey = privKeys.memo;
     const memoPublicKey = pubKeys.memo;
-    //=======================================
+    //=================================================================
     if (memo && memoToPublicKey && memoPublicKey) {
       let nonce = optional_nonce == null ? TransactionHelper.unique_nonce_uint64() : optional_nonce;
 
@@ -578,8 +584,6 @@ export default class PPY extends Plugin {
           : memo,
       };
     }
-
-    // console.log(memo_object) =============================================================
 
     // Allow user to choose asset with which to pay fees
     let feeAsset = chainAsset;
@@ -620,7 +624,7 @@ export default class PPY extends Plugin {
     }
 
     // Set the transaction fees for the new transaction
-    return await this.setRequiredFees('1.3.0', tr).then(tr => tr);
+    return this.setRequiredFees('1.3.0', tr).then(tr => tr);
   }
 
   /**
@@ -658,8 +662,10 @@ export default class PPY extends Plugin {
   async transfer({from, to, amount, memo, token, promptForSignature = true}) {
     const asset = token;
     // Get the transaction
-    const transferTransaction = await this.getTransferTransaction(from, to, amount, memo, asset);
-    // return ???
+    let transferTransaction = await this.getTransferTransaction(from, to, amount, memo, asset);
+
+    // Sign the transaction
+    // transferTransaction = this.signer(transferTransaction, publicActiveKey, false, false, privateActiveKey); // TODO: need keys to work
   }
 
   /**
