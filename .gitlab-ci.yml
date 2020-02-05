@@ -12,6 +12,7 @@ stages:
   - test
 
 build:
+  image: node:10
   stage: test
   script:
     - npm ci
