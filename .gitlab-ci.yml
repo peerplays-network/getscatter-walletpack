@@ -12,14 +12,13 @@ stages:
   - test
 
 build:
-  image: node:12.14.1-alpine
   stage: test
   script:
     - npm install
     - npm run build
     - npm run test
   tags:
-    - docker
+    - pbsa
 
 license_management:
   stage: test
