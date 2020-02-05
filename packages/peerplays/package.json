@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@walletpack/core": "^1.0.33",
+    "bignumber.js": "^9.0.0",
     "eosjs-ecc": "^4.0.7",
     "node-fetch": "^2.6.0",
     "peerplaysjs-lib": "peerplays-network/peerplaysjs-lib#release/v0.6.6-alpha",
