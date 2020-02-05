@@ -2,35 +2,45 @@
 import { assert } from 'chai';
 import Keypair from '@walletpack/core/models/Keypair';
 import { Blockchains } from '@walletpack/core/models/Blockchains';
-import { Login } from 'peerplaysjs-lib';
+import { PrivateKey as Pkey } from 'peerplaysjs-lib';
 require('isomorphic-fetch');
 
 const peerplays = new (require('../lib/peerplays').default)();
 const RandomString = require('randomstring');
 
-const username = 'unit39';
-const password = 'A4qVtjUa8t6x4mZz7BQoDWWF8Qp6UEFXtrlrBN5BPxWChenbdwKm';
-const activeWIF = '5KeU4uAV8YT4kZazX4hqakdsPck2L22dZYCHxMFkZL5TsRYex6j'
-const pubKeys = [
-  'PPY4yaEWqYHxR8QxrFFFpVwYSgzNaMUVmiNgCwM31WPbjNPDUrKqn', // owner
-  'PPY8QGhjBytYZrHpmDorLM4ETsoDYXGbGH3WT8sTrhu3LUJQ9ePf5', // active
-  'PPY64uMTGiYZQkn5P7dy87fnfVz68b4HYEBRTK1bc3wqEVTcp2GtB'  // memo
-];
+// Mainnet testing account
+const mainnetTester = {
+  username: 'unit39',
+  password: 'A4qVtjUa8t6x4mZz7BQoDWWF8Qp6UEFXtrlrBN5BPxWChenbdwKm',
+  wifs: {
+    owner: '5Hqz4M2KoEfhDML1ty8zhvpvVWqntdAXk86sDrEZBUFaVYYG5T8',
+    active: '5KeU4uAV8YT4kZazX4hqakdsPck2L22dZYCHxMFkZL5TsRYex6j',
+    memo: '5J7uqJ9TkpJi6ssnbYtqpbdEJXhp2z5KAibuyZg3LUekYJtoeUx'
+  },
+  pubKeys: {
+    owner: 'PPY4yaEWqYHxR8QxrFFFpVwYSgzNaMUVmiNgCwM31WPbjNPDUrKqn',
+    active: 'PPY8QGhjBytYZrHpmDorLM4ETsoDYXGbGH3WT8sTrhu3LUJQ9ePf5',
+    memo: 'PPY64uMTGiYZQkn5P7dy87fnfVz68b4HYEBRTK1bc3wqEVTcp2GtB'
+  }
+};
+
 const roles = ['owner','active','memo'];
 
 // account keys for 'unit39'
 const KEYPAIR = Keypair.fromJson({
-  privateKey: activeWIF,
+  privateKey: mainnetTester.wifs.active,
   blockchains: [Blockchains.PPY],
   publicKeys: [{
     key: 'PPY8QGhjBytYZrHpmDorLM4ETsoDYXGbGH3WT8sTrhu3LUJQ9ePf5', // active
-    // ownerKey: 'PPY4yaEWqYHxR8QxrFFFpVwYSgzNaMUVmiNgCwM31WPbjNPDUrKqn', // owner
-    // memoKey: 'PPY64uMTGiYZQkn5P7dy87fnfVz68b4HYEBRTK1bc3wqEVTcp2GtB', // memo
     blockchain: Blockchains.PPY
   }]
 });
 
 describe('peerplays', () => {
+  it('should convert a private key WIF to it\'s public key', async () => {
+    assert.equal(Pkey.fromWif(mainnetTester.wifs.active).toPublicKey().toPublicKeyString(), mainnetTester.pubKeys.active);
+  })
+
   it('should be able to retrieve a Peerplays accounts keys', async () => {
     const username = 'init1';
     assert.typeOf(await peerplays.getAccountKeys(username), 'object');
@@ -42,15 +52,13 @@ describe('peerplays', () => {
   });
 
   it('should successfully authorize a Peerplays account', async () => {
-    const username = 'testuser45';
-    const password = 'eu9xbavfc9DNWXd72P1TqHcwxjpY4YIuoYGlDq7Mw3COoqgILMer';
-    assert.equal(await peerplays.authUser(username, password), true);
+    assert.equal(await peerplays.authUser(mainnetTester.username, mainnetTester.password), true);
   });
 
-  it('should attempt to register a new Peerplays account (ip limit)', async () => {
+  it.only('should attempt to register a new Peerplays account (ip limit)', async () => {
     const username = RandomString.generate({
-      length: 12,
-      charset: 'alphanumeric',
+      length: 7,
+      charset: 'hex',
     });
 
     const password = RandomString.generate({
@@ -62,7 +70,9 @@ describe('peerplays', () => {
     //   `Testing registration with following data: \nusername: ${username} \npassword: ${password}`
     // );
 
-    assert.typeOf(await peerplays.register(1, username, password), 'object');
+    const response = await peerplays.register(1, username, password);
+    // console.log(response) // to check if the register worked ie: might have hit the ip limit or an account name restricted chars error
+    assert.typeOf(response, 'object');
   });
 
   it('should successfully build a transfer transaction object with no memo', async () => {
