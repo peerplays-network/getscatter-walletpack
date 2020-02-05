@@ -16,7 +16,7 @@ build:
   before_script:
     - export PATH=/home/gitlab-runner/.nvm/versions/node/$NODE_VERSION/bin:$PATH
   script:
-    - npm install
+    - npm ci
     - npm run build
     - npm run test
   tags:
