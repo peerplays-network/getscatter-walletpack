@@ -5,6 +5,9 @@ require('isomorphic-fetch');
 const peerplays = new (require('../lib/peerplays').default)();
 const RandomString = require('randomstring');
 
+const username = 'ikPdC6fahHQc';
+const password = 'jdg0OmtkzRIWfTMpN8jNZ1cbPMzGCG4hQmsDIQYfEzTEthJN4d5x';
+
 describe('peerplays', () => {
   it('should be able to retrieve a Peerplays accounts keys', async () => {
     const username = 'init1';
