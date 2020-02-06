@@ -17,6 +17,7 @@ const fetch = require('node-fetch');
 import {
   Aes,
   ChainValidation,
+  ChainConfig,
   Login,
   ops,
   PublicKey,
@@ -771,4 +772,49 @@ export default class PPY extends Plugin {
         }
       });
   }
+
+  /**
+   * Finalize transaction.
+   *
+   * @param {Object} tr - TransactionBuilder instance.
+   * @returns {Object} - tr
+   * @memberof PPY
+   */
+  async finalize(tr) {
+    const obj210 = await this._callChain(methods.GET_OBJECTS, [['2.1.0']]);
+    tr.head_block_time_string = obj210[0].time;
+
+    if(tr.expiration === 0) {
+      tr.expiration = tr.base_expiration_sec() + ChainConfig.expire_in_secs;
+    }
+
+    tr.ref_block_num = obj210[0].head_block_number & 0xffff;
+    tr.ref_block_prefix = Buffer.from(obj210[0].head_block_id, 'hex').readUInt32LE(4);
+
+    let iterable = tr.operations;
+
+    for (let i = 0, len = iterable.length; i < len; i++) {
+      let op = iterable[i];
+
+      if (op[1].finalize) {
+        op[1].finalize();
+      }
+
+      let _type = ops.operation.st_operations[op[0]];
+      let hexBuffer = _type.toBuffer(op[1]).toString('hex');
+      // console.log(
+      //   'Operation %s: %O => %s (%d bytes)',
+      //   _type.operation_name,
+      //   op[1],
+      //   hexBuffer,
+      //   hexBuffer.length / 2
+      // );
+    }
+
+    tr.tr_buffer = ops.transaction.toBuffer(tr);
+
+    return tr;
+  }
+
+  async broadcast() {}
 }
