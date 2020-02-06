@@ -133,6 +133,7 @@ describe('peerplays', () => {
     assert(tr.signer_private_keys.length > 0);
   });
 
+  // TODO: incomplete test, add assertions
   it('should successfully finalize a signed transaction (finalize)', async () => {
     const from = 'init0';
     const to = 'init1';
@@ -143,18 +144,31 @@ describe('peerplays', () => {
     let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
     tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active));
     tr = await peerplays.finalize(tr);
-    console.log(tr);
 
     // const tr = await peerplays.transfer({from, to, amount, memo, token: asset})
   })
 
-  // it('should successfully broadcast a signed transaction (transfer)', async () => {
-  //   const from = 'init0';
-  //   const to = 'init1';
-  //   const amount = 10000;
-  //   const memo = 'test memo';
-  //   const asset = '1.3.0';
+  // ONLY WORKING WITH EMPTY MEMO, NODE OUTPUTTING DIFFERENT ENCRYPTED MEMO FORMAT
+  it.only('should successfully broadcast a signed transaction (transfer)', async () => {
+    const to = 'init1';
+    const amount = 100000;
+    const memo = 'test memo';
+    const asset = '1.3.0';
 
-  //   const tr = await peerplays.transfer({from, to, amount, memo, token: asset})
-  // })
+    const dummyAccount = {
+      keypairUnique:'thing',
+      networkUnique:'ppy:chain:1',
+      publicKey: TESTING_ACCOUNT.pubKeys.active,
+      name: TESTING_ACCOUNT.username,
+      authority: 'active',
+      fromOrigin: null,
+    }
+
+    const testingKeys = {
+      pubActive: TESTING_ACCOUNT.pubKeys.active,
+      privActive: peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active)
+    }
+
+    const tr = await peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys);
+  });
 });

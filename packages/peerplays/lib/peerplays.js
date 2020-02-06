@@ -17,10 +17,12 @@ import {
   Aes,
   ChainValidation,
   ChainConfig,
+  hash,
   Login,
   ops,
   PublicKey,
   PrivateKey as Pkey,
+  Signature,
   TransactionBuilder,
   TransactionHelper,
 } from 'peerplaysjs-lib';
@@ -39,7 +41,8 @@ const methods = {
   GET_FULL_ACCOUNTS: 'get_full_accounts',
   GET_ACCOUNTS: 'get_accounts',
   GET_ASSET: 'lookup_asset_symbols',
-  BROADCAST: 'broadcast_transaction_with_callback',
+  GET_CHAIN_ID: 'get_chain_id',
+  BROADCAST: 'broadcast_transaction_with_callback'
 };
 
 const ROLES = ['owner', 'active', 'memo'];
@@ -122,8 +125,8 @@ export default class PPY extends Plugin {
     return network.blockchain === 'ppy' && network.chainId === endorsedNetwork.chainId;
   }
 
-  async getChainId(network) {
-    return 1;
+  async getChainId() {
+    return await this._callChain(methods.GET_CHAIN_ID, []);
   }
 
   usesResources() {
@@ -325,10 +328,10 @@ export default class PPY extends Plugin {
    * @returns {*} - The data from the request OR an error if there is one.
    * @memberof PPY
    */
-  async _callChain(method, params) {
+  async _callChain(method, params, api = 'database') {
     const fetchBody = JSON.stringify({
       method: 'call',
-      params: ['database', method, params],
+      params: [api, method, params],
       jsonrpc: '2.0',
       id: 1,
     });
@@ -345,7 +348,15 @@ export default class PPY extends Plugin {
         throw new Error(err);
       })
       .then(res => res.json())
-      .then(res => res.result);
+      .then(res => {
+        if (res.result) return res.result
+
+        if (res.error) {
+          throw new Error(res.error.message)
+        }
+
+        return res;
+      });
   }
 
   /**
@@ -499,23 +510,15 @@ export default class PPY extends Plugin {
             (operation.fee.amount.toString && operation.fee.amount.toString() === '0') // Long
           ) {
             operation.fee = flatAssets[assetIndex];
+            // console.log("new operation.fee", operation.fee)
           }
 
           assetIndex++;
-
-          if (operation.proposed_ops) {
-            let result = [];
-
-            for (let y = 0; y < operation.proposed_ops.length; y++) {
-              result.push(set_fee(operation.proposed_ops[y].op[1]));
-            }
-
-            return result;
-          }
+          return operation.fee;
         };
 
         for (let i = 0; i < operations.length; i++) {
-          setFee(operations[i][1]);
+          tr.operations[0][1].fee = setFee(operations[i][1]);
         }
 
         return tr;
@@ -579,29 +582,29 @@ export default class PPY extends Plugin {
     //=================================================================
     // TODO: remove this once we have keys from Scatter to use instead
     //=================================================================
-    const username = 'sample';
-    const pw = 'sample-password';
-    const { privKeys, pubKeys } = Login.generateKeys(username, pw, ROLES, PREFIX);
+    const username = 'miigunner69';
+    const pw = 'QZvbzqGng8BMYzcFW4O5TpqJEwOXmy72O0ceLVwUqeuZ4grRnVmI';
+    const { privKeys } = Login.generateKeys(username, pw, ROLES, PREFIX);
     const memoPrivateKey = privKeys.memo;
-    const memoPublicKey = pubKeys.memo;
+    const memoPublicKey = memoPrivateKey.toPublicKey().toPublicKeyString(PREFIX);
     //=================================================================
+
     if (memo && memoToPublicKey && memoPublicKey) {
       let nonce = optional_nonce == null ? TransactionHelper.unique_nonce_uint64() : optional_nonce;
+
+      // TODO: fix so memo output type is Uint8Array(16)??
+      const message = Aes.encrypt_with_checksum(
+        memoPrivateKey, // From Private Key
+        memoToPublicKey, // To Public Key
+        nonce,
+        memo
+      );
 
       memoObject = {
         from: memoPublicKey, // From Public Key
         to: memoToPublicKey, // To Public Key
         nonce,
-        message: encryptMemo
-          ? Aes.encrypt_with_checksum(
-              memoPrivateKey, // From Private Key
-              memoToPublicKey, // To Public Key
-              nonce,
-              memo
-            )
-          : Buffer.isBuffer(memo)
-          ? memo.toString('utf-8')
-          : memo,
+        message
       };
     }
 
@@ -644,7 +647,7 @@ export default class PPY extends Plugin {
     }
 
     // Set the transaction fees for the new transaction
-    return this.setRequiredFees('1.3.0', tr).then(tr => tr);
+    return await this.setRequiredFees('1.3.0', tr);
   }
 
   /**
@@ -679,7 +682,7 @@ export default class PPY extends Plugin {
    * @param {{account: Object, to: String, amount: Number, memo: String, token: String, promptForSignature: Boolean}}
    * @memberof PPY
    */
-  async transfer({ account, to, amount, memo, token, promptForSignature = true }) {
+  async transfer({ account, to, amount, memo, token, promptForSignature = true }, testingKeys) {
     const from = account.name;
     const publicActiveKey = account.publicKey;
     const asset = token;
@@ -691,7 +694,7 @@ export default class PPY extends Plugin {
     if (promptForSignature) {
       // transferTransaction = this.signerWithPopup(transferTransaction, account, )
     } else {
-      transferTransaction = this.signer(
+      transferTransaction = await this.signer(
         transferTransaction,
         publicActiveKey,
         false,
@@ -700,12 +703,27 @@ export default class PPY extends Plugin {
       ); // TODO: need keys to work
     }
 
+    if (testingKeys) {
+      const {pubActive, privActive} = testingKeys;
+
+      transferTransaction = await this.signer(
+        transferTransaction,
+        pubActive,
+        false,
+        false,
+        privActive
+      );
+    }
+
+    // Finalize the transaction
+    transferTransaction = await this.finalize(transferTransaction);
+
+    const callback = () => {
+      console.log('callback executing after broadcast');
+    }
+
     // Broadcast the transaction
-    transferTransaction
-      .broadcast(data => data)
-      .catch(err => {
-        return { error: err };
-      });
+    await this.broadcast(transferTransaction, callback);
   }
 
   /**
@@ -809,6 +827,14 @@ export default class PPY extends Plugin {
    * @memberof PPY
    */
   async finalize(tr) {
+    if (tr.signer_private_keys.length < 1) {
+      throw new Error('not signed');
+    }
+
+    if (tr.tr_buffer) {
+      throw new Error('already finalized');
+    }
+
     const obj210 = await this._callChain(methods.GET_OBJECTS, [['2.1.0']]);
     tr.head_block_time_string = obj210[0].time;
 
@@ -825,7 +851,7 @@ export default class PPY extends Plugin {
       let op = iterable[i];
 
       if (op[1].finalize) {
-        op[1].finalize();
+        op[1] = op[1].finalize();
       }
 
       let _type = ops.operation.st_operations[op[0]];
@@ -844,7 +870,50 @@ export default class PPY extends Plugin {
     return tr;
   }
 
-  async _broadcast(tr, was_broadcast_callback) {
+  async _sign(tr, chainId) {
+    if(!tr || !chainId) {
+      throw new Error('_sign: Missing inputs');
+    }
+
+    if (!tr.tr_buffer) {
+      throw new Error('not finalized');
+    }
+
+    if (tr.signatures.length > 0) {
+      throw new Error('already signed');
+    }
+
+    if (!tr.signer_private_keys.length) {
+      throw new Error('Transaction was not signed. Do you have a private key? [no_signers]');
+    }
+
+    let end = tr.signer_private_keys.length;
+
+    for (let i = 0; end > 0 ? i < end : i > end; i++) {
+      let [private_key, public_key] = tr.signer_private_keys[i];
+      let sig = Signature.signBuffer(
+        Buffer.concat([Buffer.from(chainId, 'hex'), tr.tr_buffer]),
+        private_key,
+        public_key
+      );
+      tr.signatures.push(sig.toBuffer());
+    }
+
+    tr.signer_private_keys = [];
+    tr.signed = true;
+    return tr;
+  }
+
+  async broadcast(tr, was_broadcast_callback) {
+    if (!tr || !was_broadcast_callback) {
+      throw new Error('_broadcast: Missing inputs');
+    }
+
+    if (tr.signatures.length < 1) {
+      const chainId = await this.getChainId();
+      tr = await this._sign(tr, chainId);
+    }
+
     if (!tr.tr_buffer) {
       throw new Error('not finalized');
     }
@@ -859,9 +928,10 @@ export default class PPY extends Plugin {
 
     let tr_object = ops.signed_transaction.toObject(tr);
 
-    this._callChain(methods.BROADCAST, [res => res, tr_object])
-      .then(() => {
+    return this._callChain(methods.BROADCAST, [(res) => res, tr_object], 'network_broadcast')
+      .then((data) => {
         if (was_broadcast_callback) {
+          console.log('res:', data)
           was_broadcast_callback();
         }
       })
@@ -877,19 +947,11 @@ export default class PPY extends Plugin {
           `${message}\n` +
             'peerplays-crypto ' +
             ` digest ${hash
-              .sha256(this.tr_buffer)
-              .toString('hex')} transaction ${this.tr_buffer.toString('hex')} ${JSON.stringify(
+              .sha256(tr.tr_buffer)
+              .toString('hex')} transaction ${tr.tr_buffer.toString('hex')} ${JSON.stringify(
               tr_object
             )}`
         );
       });
-  }
-
-  async broadcast(tr, was_broadcast_callback) {
-    if (tr.tr_buffer) {
-      return this._broadcast(was_broadcast_callback);
-    }
-
-    return this.finalize(tr).then(tr => this._broadcast(was_broadcast_callback));
   }
 }
