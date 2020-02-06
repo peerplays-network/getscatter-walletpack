@@ -119,4 +119,14 @@ describe('peerplays', () => {
 
     assert(tr.signer_private_keys.length > 0);
   });
+
+  // it('should successfully broadcast a signed transaction (transfer)', async () => {
+  //   const from = 'init0';
+  //   const to = 'init1';
+  //   const amount = 10000;
+  //   const memo = 'test memo';
+  //   const asset = '1.3.0';
+
+  //   const tr = await peerplays.transfer({from, to, amount, memo, token: asset})
+  // })
 });

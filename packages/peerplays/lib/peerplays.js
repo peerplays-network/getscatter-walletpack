@@ -16,9 +16,7 @@ const fetch = require('node-fetch');
 
 import {
   Aes,
-  Apis,
   ChainValidation,
-  ChainStore,
   Login,
   ops,
   PublicKey,
@@ -656,16 +654,28 @@ export default class PPY extends Plugin {
    * Perform transfer...
    * TODO: ensure returns expected
    *
-   * @param {{from: String, to: String, amount: Number, memo: String, token: String, promptForSignature: Boolean}}
+   * @param {{account: Object, to: String, amount: Number, memo: String, token: String, promptForSignature: Boolean}}
    * @memberof PPY
    */
-  async transfer({from, to, amount, memo, token, promptForSignature = true}) {
+  async transfer({account, to, amount, memo, token, promptForSignature = true}) {
+    const from = account.name;
+    const publicActiveKey = account.publicKey;
     const asset = token;
+
     // Get the transaction
     let transferTransaction = await this.getTransferTransaction(from, to, amount, memo, asset);
 
     // Sign the transaction
-    // transferTransaction = this.signer(transferTransaction, publicActiveKey, false, false, privateActiveKey); // TODO: need keys to work
+    if (promptForSignature) {
+      // transferTransaction = this.signerWithPopup(transferTransaction, account, )
+    } else {
+      transferTransaction = this.signer(transferTransaction, publicActiveKey, false, false, privateActiveKey); // TODO: need keys to work
+    }
+
+    // Broadcast the transaction
+    transferTransaction.broadcast(data => data).catch(err => {
+      return {error: err};
+    });
   }
 
   /**
