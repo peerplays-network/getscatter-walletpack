@@ -22,8 +22,24 @@ const mainnetTester = {
   prefix: 'PPY'
 };
 
+const charlieTester = {
+  username: 'miigunner69',
+  password: 'QZvbzqGng8BMYzcFW4O5TpqJEwOXmy72O0ceLVwUqeuZ4grRnVmI',
+  wifs: {
+    owner: '5KYZrFyX3YTMjBYJTrbQcs7DSPvFTa4JqdebpoGckP4SarptipG',
+    active: 'QZvbzqGng8BMYzcFW4O5TpqJEwOXmy72O0ceLVwUqeuZ4grRnVmI',
+    memo: '5KQwCkL561FYfED6LiA6Z3NCvKdAPWPX1AbYVSEPsD3yANTnFjx'
+  },
+  pubKeys: {
+    owner: 'TEST8ThZBscv57ZZtxnDndkkv6gfnbJ8ybabU4YxwfjFMoxSoXwoYA',
+    active: 'TEST5cygheeaKf7PodjGcJRXbn4wWhKAYyi7uyVe6uaMtEL4CawKpv',
+    memo: 'TEST5LTXoKUtawewrMaqEduF5gAQwbwSS6MbtEKdXYMTjekTq5m3JW'
+  },
+  prefix: 'TEST'
+};
+
 // If using a non mainnet account, provide account data above and change the assignment below.
-const TESTING_ACCOUNT = mainnetTester; // don't forget to update the endpoint in use in peerplays.js if using a non-mainnet account
+const TESTING_ACCOUNT = charlieTester; // don't forget to update the endpoint in use in peerplays.js if using a non-mainnet account
 
 // TODO: remove?
 // account keys for 'unit39'
@@ -60,7 +76,7 @@ describe('peerplays', () => {
   });
 
   it('should successfully authorize a Peerplays account', async () => {
-    assert.equal(await peerplays.authUser(mainnetTester.username, mainnetTester.password), true);
+    assert.equal(await peerplays.authUser(TESTING_ACCOUNT.username, TESTING_ACCOUNT.password), true);
   });
 
   it('should attempt to register a new Peerplays account', async () => {
@@ -119,6 +135,21 @@ describe('peerplays', () => {
 
     assert(tr.signer_private_keys.length > 0);
   });
+
+  it('should successfully finalize a signed transaction (finalize)', async () => {
+    const from = 'init0';
+    const to = 'init1';
+    const amount = 10000;
+    const memo = 'test memo';
+    const asset = '1.3.0';
+
+    let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
+    tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active));
+    tr = await peerplays.finalize(tr);
+    console.log(tr);
+
+    // const tr = await peerplays.transfer({from, to, amount, memo, token: asset})
+  })
 
   // it('should successfully broadcast a signed transaction (transfer)', async () => {
   //   const from = 'init0';

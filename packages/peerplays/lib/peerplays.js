@@ -47,7 +47,7 @@ const ROLES = ['owner', 'active', 'memo'];
 const MAINNET_CHAIN_ID = '6b6b5f0ce7a36d323768e534f3edb41c6d6332a541a95725b98e28d140850134';
 
 const MAINNET_ENDPOINT_1 = 'https://pma.blockveritas.co/ws';
-const MAINNET_FAUCET = 'https://faucet.peerplays.download/faucet';
+const MAINNET_FAUCET = 'https://faucet.peerplays.download/api/v1/accounts';
 
 const TESTNET_ENDPOINT_1 = '';
 const TESTNET_FAUCET = '';
