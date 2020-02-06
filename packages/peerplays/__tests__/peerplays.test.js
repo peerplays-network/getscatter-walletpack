@@ -108,7 +108,6 @@ describe('peerplays', () => {
     expect(tr.operations[0][1].fee.amount).to.not.be.empty;
   });
 
-  // Not compatible with testnets that have a PREFIX other than 'PPY'
   it('should successfully build a transfer transaction object with a memo', async () => {
     const from = 'init0';
     const to = 'init1';
@@ -121,7 +120,6 @@ describe('peerplays', () => {
     expect(tr.operations[0][1].fee.amount).to.not.be.empty;
   });
 
-  // Not compatible with testnets that have a PREFIX other than 'PPY'
   it('should successfully sign a transaction (signer)', async () => {
     const from = 'init0';
     const to = 'init1';
@@ -135,7 +133,6 @@ describe('peerplays', () => {
     assert(tr.signer_private_keys.length > 0);
   });
 
-  // Not compatible with testnets that have a PREFIX other than 'PPY'
   it('should successfully finalize a signed transaction (finalize)', async () => {
     const from = 'init0';
     const to = 'init1';
