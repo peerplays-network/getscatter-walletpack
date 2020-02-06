@@ -1,5 +1,6 @@
 'use strict';
 import { assert, expect } from 'chai';
+import { Login } from 'peerplaysjs-lib';
 require('isomorphic-fetch');
 
 const peerplays = new (require('../lib/peerplays').default)();
@@ -27,7 +28,7 @@ const charlieTester = {
   password: 'QZvbzqGng8BMYzcFW4O5TpqJEwOXmy72O0ceLVwUqeuZ4grRnVmI',
   wifs: {
     owner: '5KYZrFyX3YTMjBYJTrbQcs7DSPvFTa4JqdebpoGckP4SarptipG',
-    active: 'QZvbzqGng8BMYzcFW4O5TpqJEwOXmy72O0ceLVwUqeuZ4grRnVmI',
+    active: '5JDuvHrcj66Ts5af1NLH3XbdTqepTwbNCJYuLyh1j2QGMztArsS',
     memo: '5KQwCkL561FYfED6LiA6Z3NCvKdAPWPX1AbYVSEPsD3yANTnFjx'
   },
   pubKeys: {
@@ -41,18 +42,14 @@ const charlieTester = {
 // If using a non mainnet account, provide account data above and change the assignment below.
 const TESTING_ACCOUNT = charlieTester; // don't forget to update the endpoint in use in peerplays.js if using a non-mainnet account
 
-// TODO: remove?
-// account keys for 'unit39'
-// const KEYPAIR = Keypair.fromJson({
-//   privateKey: mainnetTester.wifs.active,
-//   blockchains: [Blockchains.PPY],
-//   publicKeys: [{
-//     key: 'PPY8QGhjBytYZrHpmDorLM4ETsoDYXGbGH3WT8sTrhu3LUJQ9ePf5', // active
-//     blockchain: Blockchains.PPY
-//   }]
-// });
-
 describe('peerplays', () => {
+  // it.only('keyskeyskeys', async () => {
+  //   const keys = Login.generateKeys(TESTING_ACCOUNT.username, TESTING_ACCOUNT.password, ['owner', 'active', 'memo'], 'TEST');
+  //   console.log('owner wif: ', peerplays.wifFromPrivate(keys.privKeys.owner))
+  //   console.log('active wif: ', peerplays.wifFromPrivate(keys.privKeys.active))
+  //   console.log('memo wif: ', peerplays.wifFromPrivate(keys.privKeys.memo))
+  // })
+
   it('should convert a private key WIF to it\'s public key (privateToPublic)', async () => {
     const [wif, prefix, publicKey] = [TESTING_ACCOUNT.wifs.active, TESTING_ACCOUNT.prefix, TESTING_ACCOUNT.pubKeys.active]
     assert(peerplays.privateToPublic(wif, prefix) === publicKey, 'Bad public key');
@@ -62,7 +59,7 @@ describe('peerplays', () => {
     const ppy = peerplays;
     const wif = TESTING_ACCOUNT.wifs.active;
     const pk = peerplays.privateFromWif(wif);
-    assert(ppy.privateToPublic(ppy.wifFromPrivate(pk)) === TESTING_ACCOUNT.pubKeys.active);
+    assert(ppy.privateToPublic(ppy.wifFromPrivate(pk), TESTING_ACCOUNT.prefix) === TESTING_ACCOUNT.pubKeys.active);
   })
 
   it('should be able to retrieve a Peerplays accounts keys', async () => {
@@ -111,6 +108,7 @@ describe('peerplays', () => {
     expect(tr.operations[0][1].fee.amount).to.not.be.empty;
   });
 
+  // Not compatible with testnets that have a PREFIX other than 'PPY'
   it('should successfully build a transfer transaction object with a memo', async () => {
     const from = 'init0';
     const to = 'init1';
@@ -123,19 +121,21 @@ describe('peerplays', () => {
     expect(tr.operations[0][1].fee.amount).to.not.be.empty;
   });
 
+  // Not compatible with testnets that have a PREFIX other than 'PPY'
   it('should successfully sign a transaction (signer)', async () => {
     const from = 'init0';
     const to = 'init1';
     const amount = 10000;
     const memo = 'test memo';
     const asset = '1.3.0';
-    // sample transfer transaction
+
     let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
     tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active));
 
     assert(tr.signer_private_keys.length > 0);
   });
 
+  // Not compatible with testnets that have a PREFIX other than 'PPY'
   it('should successfully finalize a signed transaction (finalize)', async () => {
     const from = 'init0';
     const to = 'init1';

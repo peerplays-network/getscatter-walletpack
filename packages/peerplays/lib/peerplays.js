@@ -149,7 +149,7 @@ export default class PPY extends Plugin {
   privateToPublic(privateKeyWif, prefix = null) {
     return this.privateFromWif(privateKeyWif)
       .toPublicKey()
-      .toString(prefix ? prefix : 'PPY');
+      .toPublicKeyString(prefix ? prefix : 'PPY');
   }
 
   validPrivateKey(privateKey) {
