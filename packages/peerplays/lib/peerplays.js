@@ -60,6 +60,10 @@ const PREFIX = TESTNET_PREFIX;
 const ENDPOINT = TESTNET_ENDPOINT_1;
 const FAUCET = TESTNET_FAUCET;
 
+if (PREFIX !== DEFAULT_PREFIX) {
+  ChainConfig.setPrefix(PREFIX);
+}
+
 let cachedInstances;
 
 export default class PPY extends Plugin {
