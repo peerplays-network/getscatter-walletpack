@@ -7,7 +7,6 @@ import KeyPairService from '@walletpack/core/services/secure/KeyPairService';
 import Token from '@walletpack/core/models/Token';
 import HardwareService from '@walletpack/core/services/secure/HardwareService';
 import StoreService from '@walletpack/core/services/utility/StoreService';
-import TokenService from '@walletpack/core/services/utility/TokenService';
 import EventService from '@walletpack/core/services/utility/EventService';
 import SigningService from '@walletpack/core/services/secure/SigningService';
 import ecc from 'eosjs-ecc';
@@ -23,7 +22,7 @@ import {
   PublicKey,
   PrivateKey as Pkey,
   TransactionBuilder,
-  TransactionHelper
+  TransactionHelper,
 } from 'peerplaysjs-lib';
 
 //TO-DO: Replace with Peerplays explorer.
@@ -43,16 +42,24 @@ const methods = {
   BROADCAST: 'broadcast_transaction_with_callback',
 };
 
-const roles = ['owner', 'active', 'memo'];
+const ROLES = ['owner', 'active', 'memo'];
 
-const MAINNET_CHAIN_ID = '6b6b5f0ce7a36d323768e534f3edb41c6d6332a541a95725b98e28d140850134'; // alice
-const TESTNET_CHAIN_ID = 'b3f7fe1e5ad0d2deca40a626a4404524f78e65c3a48137551c33ea4e7c365672'; // beatrice
+const MAINNET_CHAIN_ID = '6b6b5f0ce7a36d323768e534f3edb41c6d6332a541a95725b98e28d140850134';
 
 const MAINNET_ENDPOINT_1 = 'https://pma.blockveritas.co/ws';
 const MAINNET_FAUCET = 'https://faucet.peerplays.download/faucet';
-const PREFIX = 'PPY';
 
-let isLegacy = false;
+const TESTNET_ENDPOINT_1 = '';
+const TESTNET_FAUCET = '';
+
+const DEFAULT_PREFIX = 'PPY';
+const TESTNET_PREFIX = 'TEST';
+
+// Override these for testnets
+const PREFIX = TESTNET_PREFIX;
+const ENDPOINT = TESTNET_ENDPOINT_1;
+const FAUCET = TESTNET_FAUCET;
+
 let cachedInstances;
 
 export default class PPY extends Plugin {
@@ -140,7 +147,9 @@ export default class PPY extends Plugin {
   }
 
   privateToPublic(privateKeyWif, prefix = null) {
-    return this.privateFromWif(privateKeyWif).toPublicKey().toString(prefix ? prefix : 'PPY');
+    return this.privateFromWif(privateKeyWif)
+      .toPublicKey()
+      .toString(prefix ? prefix : 'PPY');
   }
 
   validPrivateKey(privateKey) {
@@ -156,7 +165,7 @@ export default class PPY extends Plugin {
   }
 
   bufferToHexPrivate(buffer) {
-    const bufKey = Pkey.fromBuffer(Buffer.from(buffer))
+    const bufKey = Pkey.fromBuffer(Buffer.from(buffer));
     return bufKey.toWif();
   }
 
@@ -254,7 +263,7 @@ export default class PPY extends Plugin {
     }
 
     // Sign the Peerplays transaction with private and public key
-    transaction.add_signer(privateKey, publicKey)
+    transaction.add_signer(privateKey, publicKey);
     return transaction;
 
     // if (!privateKey) privateKey = await KeyPairService.publicToPrivate(publicKey);
@@ -314,26 +323,25 @@ export default class PPY extends Plugin {
    */
   async _callChain(method, params) {
     const fetchBody = JSON.stringify({
-      "method": "call",
-      "params": [
-        "database",
-        method,
-        params
-      ],
-      "jsonrpc": "2.0",
-      "id": 1
+      method: 'call',
+      params: ['database', method, params],
+      jsonrpc: '2.0',
+      id: 1,
     });
 
-    return await fetch(MAINNET_ENDPOINT_1, {
+    return await fetch(ENDPOINT, {
       body: fetchBody,
       method: 'POST',
       headers: {
-        'Accept': 'application/json',
-        'Content-type': 'application/json'
-      }
-    }).catch(err => {
-      throw new Error(err);
-    }).then(res => res.json()).then(res => res.result);
+        Accept: 'application/json',
+        'Content-type': 'application/json',
+      },
+    })
+      .catch(err => {
+        throw new Error(err);
+      })
+      .then(res => res.json())
+      .then(res => res.result);
   }
 
   /**
@@ -527,7 +535,16 @@ export default class PPY extends Plugin {
    * @returns {Object} - A TransactionBuilder transaction instance with fees set on the transaction for a transfer operation.
    * @memberof PPY
    */
-  async getTransferTransaction(from, to, amount, memo, asset, proposeAccount = null, encryptMemo = true, optional_nonce = null) {
+  async getTransferTransaction(
+    from,
+    to,
+    amount,
+    memo,
+    asset,
+    proposeAccount = null,
+    encryptMemo = true,
+    optional_nonce = null
+  ) {
     let feeAssetId = asset;
     if (!from || !to || !amount || !asset) {
       throw new Error('transfer: Missing inputs');
@@ -558,9 +575,9 @@ export default class PPY extends Plugin {
     //=================================================================
     // TODO: remove this once we have keys from Scatter to use instead
     //=================================================================
-    const username = 'sample'
-    const pw = 'sample-password'
-    const { privKeys, pubKeys } = Login.generateKeys(username, pw, roles, PREFIX);
+    const username = 'sample';
+    const pw = 'sample-password';
+    const { privKeys, pubKeys } = Login.generateKeys(username, pw, ROLES, PREFIX);
     const memoPrivateKey = privKeys.memo;
     const memoPublicKey = pubKeys.memo;
     //=================================================================
@@ -636,7 +653,7 @@ export default class PPY extends Plugin {
   async getAccountKeys(accountNameOrId) {
     const keys = {};
     const account = await this.getFullAccount(accountNameOrId);
-    roles.forEach(role => {
+    ROLES.forEach(role => {
       let key;
 
       if (role === 'memo') {
@@ -658,7 +675,7 @@ export default class PPY extends Plugin {
    * @param {{account: Object, to: String, amount: Number, memo: String, token: String, promptForSignature: Boolean}}
    * @memberof PPY
    */
-  async transfer({account, to, amount, memo, token, promptForSignature = true}) {
+  async transfer({ account, to, amount, memo, token, promptForSignature = true }) {
     const from = account.name;
     const publicActiveKey = account.publicKey;
     const asset = token;
@@ -670,13 +687,21 @@ export default class PPY extends Plugin {
     if (promptForSignature) {
       // transferTransaction = this.signerWithPopup(transferTransaction, account, )
     } else {
-      transferTransaction = this.signer(transferTransaction, publicActiveKey, false, false, privateActiveKey); // TODO: need keys to work
+      transferTransaction = this.signer(
+        transferTransaction,
+        publicActiveKey,
+        false,
+        false,
+        privateActiveKey
+      ); // TODO: need keys to work
     }
 
     // Broadcast the transaction
-    transferTransaction.broadcast(data => data).catch(err => {
-      return {error: err};
-    });
+    transferTransaction
+      .broadcast(data => data)
+      .catch(err => {
+        return { error: err };
+      });
   }
 
   /**
@@ -685,12 +710,11 @@ export default class PPY extends Plugin {
    *
    * @param {String} username - The login username to associate with the account to be registered.
    * @param {String} password - The login password to associate with the account to be registered.
-   * @param {String} prefix - Optional prefix.
    * @returns {Boolean}
    */
-  async authUser(username, password, prefix = 'PPY') {
+  async authUser(username, password) {
     // Ensure the Login class has the correct roles configured.
-    Login.setRoles(roles);
+    Login.setRoles(ROLES);
 
     const userPubKeys = await this.getAccountKeys(username);
 
@@ -701,7 +725,7 @@ export default class PPY extends Plugin {
     };
 
     // TODO: modify this such that the Scatter UI has the data it requires to import an existing account. Likely will require to generate keys and return them to something
-    const authed = Login.checkKeys(user, prefix);
+    const authed = Login.checkKeys(user, PREFIX);
 
     return authed;
   }
@@ -729,8 +753,8 @@ export default class PPY extends Plugin {
    * @memberof PPY
    */
   async register(attempt, username, password, referral = null) {
-    Login.setRoles(roles);
-    let keys = Login.generateKeys(username, password, roles, PREFIX);
+    Login.setRoles(ROLES);
+    let keys = Login.generateKeys(username, password, ROLES, PREFIX);
     const [ownerPub, activePub, memoPub] = [
       keys.pubKeys.owner,
       keys.pubKeys.active,
@@ -753,7 +777,7 @@ export default class PPY extends Plugin {
     });
 
     // We use a separate fetch here as we want this to potentially have multiple tries.
-    return await fetch(MAINNET_FAUCET, {
+    return await fetch(FAUCET, {
       method: 'post',
       mode: 'cors',
       headers: {
@@ -784,7 +808,7 @@ export default class PPY extends Plugin {
     const obj210 = await this._callChain(methods.GET_OBJECTS, [['2.1.0']]);
     tr.head_block_time_string = obj210[0].time;
 
-    if(tr.expiration === 0) {
+    if (tr.expiration === 0) {
       tr.expiration = tr.base_expiration_sec() + ChainConfig.expire_in_secs;
     }
 
@@ -816,5 +840,52 @@ export default class PPY extends Plugin {
     return tr;
   }
 
-  async broadcast() {}
+  async _broadcast(tr, was_broadcast_callback) {
+    if (!tr.tr_buffer) {
+      throw new Error('not finalized');
+    }
+
+    if (!tr.signatures.length) {
+      throw new Error('not signed');
+    }
+
+    if (!tr.operations.length) {
+      throw new Error('no operations');
+    }
+
+    let tr_object = ops.signed_transaction.toObject(tr);
+
+    this._callChain(methods.BROADCAST, [res => res, tr_object])
+      .then(() => {
+        if (was_broadcast_callback) {
+          was_broadcast_callback();
+        }
+      })
+      .catch(error => {
+        console.log(error);
+        let { message } = error;
+
+        if (!message) {
+          message = '';
+        }
+
+        throw new Error(
+          `${message}\n` +
+            'peerplays-crypto ' +
+            ` digest ${hash
+              .sha256(this.tr_buffer)
+              .toString('hex')} transaction ${this.tr_buffer.toString('hex')} ${JSON.stringify(
+              tr_object
+            )}`
+        );
+      });
+  }
+
+  async broadcast(tr, was_broadcast_callback) {
+    if (tr.tr_buffer) {
+      return this._broadcast(was_broadcast_callback);
+    }
+
+    return this.finalize(tr).then(tr => this._broadcast(was_broadcast_callback));
+  }
 }
