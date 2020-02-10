@@ -189,13 +189,13 @@ export default class PPY extends Plugin {
     return asset.precision || 5;
   }
 
-  async defaultToken() {
+  defaultToken() {
     return new Token(
       Blockchains.PPY,
       'ppy',
       'PPY',
       'PPY',
-      await this.defaultDecimals('1.3.0'),
+      5,
       MAINNET_CHAIN_ID
     );
   }
@@ -210,7 +210,7 @@ export default class PPY extends Plugin {
    * Returns an array of Token class.
    */
   async balancesFor(account, tokens, fallback = false) {
-    let fullAccount = await this.getFullAccount(account.name);
+    let fullAccount = await this.getFullAccountObject(account.name);
     let unformattedBalance;
     let tokenArray = [];
     let assetId = '1.3.0';
@@ -246,7 +246,7 @@ export default class PPY extends Plugin {
    * Returns a Token class where `token.amount` is the balance.
    */
   async balanceFor(account, token) {
-    let fullAccount = await this.getFullAccount(account.name);
+    let fullAccount = await this.getFullAccountObject(account.name);
     let unformattedBalance;
     let assetId = '1.3.0';
 
@@ -403,6 +403,22 @@ export default class PPY extends Plugin {
     const res = await this._callChain(methods.GET_FULL_ACCOUNTS, [[accountNameOrId], true]);
     return res[0][1].account;
   }
+
+  /**
+   * Requests from Peerplays blockchain for full object.
+   *
+   * @param {String} accountNameOrId - The Peerplays account username to request data for.
+   * @returns {Object}
+   * @memberof PPY
+   */
+  async getFullAccountObject(accountNameOrId) {
+    if (!accountNameOrId) {
+      throw new Error('getFullAccount: Missing input');
+    }
+    const res = await this._callChain(methods.GET_FULL_ACCOUNTS, [[accountNameOrId], true]);
+    return res[0][1];
+  }
+  
 
   /**
    * Used by setRequiredFees.
