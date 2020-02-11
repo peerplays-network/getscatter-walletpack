@@ -17,6 +17,7 @@ import {
   Aes,
   ChainValidation,
   ChainConfig,
+  ChainTypes,
   hash,
   Login,
   ops,
@@ -42,7 +43,7 @@ const methods = {
   GET_ACCOUNTS: 'get_accounts',
   GET_ASSET: 'lookup_asset_symbols',
   GET_CHAIN_ID: 'get_chain_id',
-  BROADCAST: 'broadcast_transaction_with_callback'
+  BROADCAST: 'broadcast_transaction_with_callback',
 };
 
 const ROLES = ['owner', 'active', 'memo'];
@@ -190,14 +191,7 @@ export default class PPY extends Plugin {
   }
 
   defaultToken() {
-    return new Token(
-      Blockchains.PPY,
-      'ppy',
-      'PPY',
-      'PPY',
-      5,
-      MAINNET_CHAIN_ID
-    );
+    return new Token(Blockchains.PPY, 'ppy', 'PPY', 'PPY', 5, MAINNET_CHAIN_ID);
   }
 
   actionParticipants(payload) {
@@ -262,24 +256,6 @@ export default class PPY extends Plugin {
     const clone = token.clone();
     clone.amount = balance;
     return clone;
-  }
-
-  async signer(transaction, publicKey, arbitrary = false, isHash = false, privateKey = null) {
-    if (!publicKey && privateKey) {
-      publicKey = this.privateToPublic(privateKey);
-    }
-
-    // Sign the Peerplays transaction with private and public key
-    transaction.add_signer(privateKey, publicKey);
-    return transaction;
-
-    // if (!privateKey) privateKey = await KeyPairService.publicToPrivate(publicKey);
-    // if (!privateKey) return;
-
-    // if (typeof privateKey !== 'string') privateKey = this.bufferToHexPrivate(privateKey);
-
-    // if (arbitrary && isHash) return ecc.Signature.signHash(payload.data, privateKey).toString();
-    // return ecc.sign(Buffer.from(arbitrary ? payload.data : payload.buf, 'utf8'), privateKey);
   }
 
   async signerWithPopup(payload, account, rejector) {
@@ -349,10 +325,10 @@ export default class PPY extends Plugin {
       })
       .then(res => res.json())
       .then(res => {
-        if (res.result) return res.result
+        if (res.result) return res.result;
 
         if (res.error) {
-          throw new Error(res.error.message)
+          throw new Error(res.error.message);
         }
 
         return res;
@@ -386,7 +362,7 @@ export default class PPY extends Plugin {
     if (!objIds || objIds.length === 0) {
       throw new Error('getObjects: Missing inputs');
     }
-    return await this._callChain(methods.GET_OBJECTS, [objIds]);
+    return await this._callChain(methods.GET_OBJECTS, [[objIds]]);
   }
 
   /**
@@ -418,7 +394,6 @@ export default class PPY extends Plugin {
     const res = await this._callChain(methods.GET_FULL_ACCOUNTS, [[accountNameOrId], true]);
     return res[0][1];
   }
-  
 
   /**
    * Used by setRequiredFees.
@@ -436,6 +411,35 @@ export default class PPY extends Plugin {
   }
 
   /**
+   * Get the requires fees associated with an operation.
+   *
+   * @param {String} opToPrice
+   * @returns {Object} fees
+   * @memberof PPY
+   */
+  async getFees(opToPrice) {
+    if (!opToPrice) {
+      throw new Error('getFee: Missing inputs');
+    }
+
+    const op = ChainTypes.operations[opToPrice];
+
+    if (op === undefined) {
+      throw new Error('getFee: No operation matching request');
+    }
+
+    let fee;
+
+    // Get the fee schedule
+    const obj200 = await this.getObjects('2.0.0');
+    const feeSchedule = obj200[0].parameters.current_fees.parameters;
+
+    // Return the fees associated with `opToPrice`
+    return feeSchedule[op][1];
+  }
+
+  /**
+   * TODO: incomplete
    * By providing a transaction builder instance transaction and the asset to use for the fees, this function will
    * return the fees associated with all operations within said transaction object instance.
    *
@@ -467,203 +471,37 @@ export default class PPY extends Plugin {
       }
     }
 
-    let promises = [await this.getRequiredFees(operations, assetId)];
+    let totalFee = 0;
+    const fees = await this.getFees('transfer');
+    const {fee, price_per_kbyte} = fees;
+    console.log(`fee: ${fee} price_per_kbyte: ${price_per_kbyte}`)
 
-    if (assetId !== '1.3.0') {
-      // This handles the fallback to paying fees in BTS if the fee pool is empty.
-      promises.push(await this.getRequiredFees(operations, '1.3.0'));
-      promises.push(await this.getObjects('1.3.0'));
+    totalFee = fee;
+
+    // If there is a memo, we must calculate the price/kb on its message contents
+    if (tr.operations[0][1].memo) {
+      // get size of the memo in bytes
+      let memoBuf = tr.operations[0][1].memo.message;
+      let arrayBuf = memoBuf.buffer.slice(memoBuf.byteOffset, memoBuf.byteOffset + memoBuf.byteLength);
+      let typedArr = new Uint32Array(memoBuf.buffer, memoBuf.byteOffset, memoBuf.byteLength / Uint32Array.BYTES_PER_ELEMENT);
+      console.log('typedarr', typedArr.length)
+      const memoByteSize = tr.operations[0][1].memo.message.length;
+      totalFee += ((memoByteSize/1024) * price_per_kbyte);
+      console.log('totalFee:',totalFee)
+
+      let _type = ops.operation.st_operations[0];
+      console.log('SIZE:', _type.toBuffer(tr.operations[0][1]).length/2);
+      let hexBuffer = _type.toBuffer(tr.operations[0][1]).toString('hex');
+      let size = hexBuffer.length / 2;
+      // totalFee = (size*price_per_kbyte)/1024;
+      console.log('hexBuffer',hexBuffer.length / 2);
     }
 
-    return Promise.all(promises).then(res => {
-      let [fees, coreFees, asset] = res,
-        dynamicPromise;
-      asset = asset ? asset[0] : null;
+    // "test memo" = 89843. total transfer fee with memo "test memo" = 2089843
+    // getting: 15625, total: 2015625
+    tr.operations[0][1].fee = {amount: totalFee, asset_id: assetId};
 
-      dynamicPromise =
-        assetId !== '1.3.0' && asset
-          ? this.getObjects(asset.dynamic_asset_data_id)
-          : new Promise(resolve => resolve());
-
-      return dynamicPromise.then(dynamicObject => {
-        if (assetId !== '1.3.0') {
-          feePool = dynamicObject ? dynamicObject[0].fee_pool : 0;
-          let totalFees = 0;
-
-          for (let j = 0, fee; j < coreFees.length; j++) {
-            fee = coreFees[j];
-            totalFees += fee.amount;
-          }
-
-          if (totalFees > parseInt(fee_pool, 10)) {
-            fees = coreFees;
-            assetId = '1.3.0';
-          }
-        }
-
-        // Proposed transactions need to be flattened
-        let flatAssets = [];
-
-        let flatten = obj => {
-          if (Array.isArray(obj)) {
-            for (let k = 0, len = obj.length; k < len; k++) {
-              let item = obj[k];
-              flatten(item);
-            }
-          } else {
-            flatAssets.push(obj);
-          }
-        };
-
-        flatten(fees);
-
-        let assetIndex = 0;
-
-        let setFee = operation => {
-          if (
-            !operation.fee ||
-            operation.fee.amount === 0 ||
-            (operation.fee.amount.toString && operation.fee.amount.toString() === '0') // Long
-          ) {
-            operation.fee = flatAssets[assetIndex];
-            // console.log("new operation.fee", operation.fee)
-          }
-
-          assetIndex++;
-          return operation.fee;
-        };
-
-        for (let i = 0; i < operations.length; i++) {
-          tr.operations[0][1].fee = setFee(operations[i][1]);
-        }
-
-        return tr;
-      });
-    });
-  }
-
-  /**
-   * TODO: incomplete
-   * Construct an unsigned transaction for a transfer operation with correct fees.
-   *
-   * @param {Object} args - Required params for the construction of the transaction and its operations.
-   * @param {String} from - The sending Peerplays account name.
-   * @param {String} to - The recipient Peerplays account name.
-   * @param {Number} amount - The numerical amount of funds to send to the recipient.
-   * @param {String} memo - The optional message to send along with the funds being transferred.
-   * @param {String} asset - The Peerplays asset (User Issued Asset token) id associated with the transfer.
-   * @param {String} proposeAccount - Optional, default null. The Peerplays account name to be proposed.
-   * @param {Boolean} encryptMemo - Optional, default true. Whether or not to encrypt the memo.
-   *
-   * @returns {Object} - A TransactionBuilder transaction instance with fees set on the transaction for a transfer operation.
-   * @memberof PPY
-   */
-  async getTransferTransaction(
-    from,
-    to,
-    amount,
-    memo,
-    asset,
-    proposeAccount = null,
-    encryptMemo = true,
-    optional_nonce = null
-  ) {
-    let feeAssetId = asset;
-    if (!from || !to || !amount || !asset) {
-      throw new Error('transfer: Missing inputs');
-    }
-
-    let memoToPublicKey;
-
-    // get account data for `from`, `to`, & `proposeAccount`
-    const [chainFrom, chainTo] = [await this.getFullAccount(from), await this.getFullAccount(to)];
-    const chainProposeAccount = proposeAccount && (await this.getFullAccount(proposeAccount));
-
-    // get asset data
-    let chainAsset = await this.getAsset(asset);
-
-    // If we have a non-empty string memo and are configured to encrypt...
-    if (memo && encryptMemo) {
-      memoToPublicKey = chainTo.options.memo_key;
-
-      // Check for a null memo key, if the memo key is null use the receivers active key
-      if (/PPY1111111111111111111111111111111114T1Anm/.test(memoToPublicKey)) {
-        memoToPublicKey = chainTo.active.key_auths[0][0];
-      }
-    }
-
-    let proposeAcountId = proposeAccount ? chainProposeAccount.id : null;
-    let memoObject;
-
-    //=================================================================
-    // TODO: remove this once we have keys from Scatter to use instead
-    //=================================================================
-    const username = 'miigunner69';
-    const pw = 'QZvbzqGng8BMYzcFW4O5TpqJEwOXmy72O0ceLVwUqeuZ4grRnVmI';
-    const { privKeys } = Login.generateKeys(username, pw, ROLES, PREFIX);
-    const memoPrivateKey = privKeys.memo;
-    const memoPublicKey = memoPrivateKey.toPublicKey().toPublicKeyString(PREFIX);
-    //=================================================================
-
-    if (memo && memoToPublicKey && memoPublicKey) {
-      let nonce = optional_nonce == null ? TransactionHelper.unique_nonce_uint64() : optional_nonce;
-
-      // TODO: fix so memo output type is Uint8Array(16)??
-      const message = Aes.encrypt_with_checksum(
-        memoPrivateKey, // From Private Key
-        memoToPublicKey, // To Public Key
-        nonce,
-        memo
-      );
-
-      memoObject = {
-        from: memoPublicKey, // From Public Key
-        to: memoToPublicKey, // To Public Key
-        nonce,
-        message
-      };
-    }
-
-    // Allow user to choose asset with which to pay fees
-    let feeAsset = chainAsset;
-
-    // Default to CORE in case of faulty core_exchange_rate
-    if (
-      feeAsset.options.core_exchange_rate.base.asset_id === '1.3.0' &&
-      feeAsset.options.core_exchange_rate.quote.asset_id === '1.3.0'
-    ) {
-      feeAssetId = '1.3.0';
-    }
-
-    let tr = new TransactionBuilder();
-
-    let transferOp = tr.get_type_operation('transfer', {
-      fee: {
-        amount: 0,
-        asset_id: feeAssetId,
-      },
-      from: chainFrom.id,
-      to: chainTo.id,
-      amount: {
-        amount,
-        asset_id: chainAsset.id,
-      },
-      memo: memoObject,
-    });
-
-    if (proposeAccount) {
-      let proposalCreateOp = tr.get_type_operation('proposal_create', {
-        proposed_ops: [{ op: transferOp }],
-        fee_paying_account: proposeAcountId,
-      });
-      tr.add_operation(proposalCreateOp);
-      tr.operations[0][1].expiration_time = parseInt(Date.now() / 1000 + 5);
-    } else {
-      tr.add_operation(transferOp);
-    }
-
-    // Set the transaction fees for the new transaction
-    return await this.setRequiredFees('1.3.0', tr);
+    return tr;
   }
 
   /**
@@ -689,57 +527,6 @@ export default class PPY extends Plugin {
     });
 
     return keys;
-  }
-
-  /**
-   * Perform transfer...
-   * TODO: ensure returns expected
-   *
-   * @param {{account: Object, to: String, amount: Number, memo: String, token: String, promptForSignature: Boolean}}
-   * @memberof PPY
-   */
-  async transfer({ account, to, amount, memo, token, promptForSignature = true }, testingKeys) {
-    const from = account.name;
-    const publicActiveKey = account.publicKey;
-    const asset = token;
-
-    // Get the transaction
-    let transferTransaction = await this.getTransferTransaction(from, to, amount, memo, asset);
-
-    // Sign the transaction
-    if (promptForSignature) {
-      // transferTransaction = this.signerWithPopup(transferTransaction, account, )
-    } else {
-      transferTransaction = await this.signer(
-        transferTransaction,
-        publicActiveKey,
-        false,
-        false,
-        privateActiveKey
-      ); // TODO: need keys to work
-    }
-
-    if (testingKeys) {
-      const {pubActive, privActive} = testingKeys;
-
-      transferTransaction = await this.signer(
-        transferTransaction,
-        pubActive,
-        false,
-        false,
-        privActive
-      );
-    }
-
-    // Finalize the transaction
-    transferTransaction = await this.finalize(transferTransaction);
-
-    const callback = () => {
-      console.log('callback executing after broadcast');
-    }
-
-    // Broadcast the transaction
-    await this.broadcast(transferTransaction, callback);
   }
 
   /**
@@ -836,6 +623,162 @@ export default class PPY extends Plugin {
   }
 
   /**
+   * TODO: incomplete
+   * Construct an unsigned transaction for a transfer operation with correct fees.
+   *
+   * @param {Object} args - Required params for the construction of the transaction and its operations.
+   * @param {String} from - The sending Peerplays account name.
+   * @param {String} to - The recipient Peerplays account name.
+   * @param {Number} amount - The numerical amount of funds to send to the recipient.
+   * @param {String} memo - The optional message to send along with the funds being transferred.
+   * @param {String} asset - The Peerplays asset (User Issued Asset token) id associated with the transfer.
+   * @param {String} proposeAccount - Optional, default null. The Peerplays account name to be proposed.
+   * @param {Boolean} encryptMemo - Optional, default true. Whether or not to encrypt the memo.
+   *
+   * @returns {Object} - A TransactionBuilder transaction instance with fees set on the transaction for a transfer operation.
+   * @memberof PPY
+   */
+  async getTransferTransaction(
+    from,
+    to,
+    amount,
+    memo,
+    asset,
+    proposeAccount = null,
+    encryptMemo = true,
+    optional_nonce = null
+  ) {
+    let feeAssetId = asset;
+    if (!from || !to || !amount || !asset) {
+      throw new Error('transfer: Missing inputs');
+    }
+
+    let memoToPublicKey;
+
+    // get account data for `from`, `to`, & `proposeAccount`
+    const [chainFrom, chainTo] = [await this.getFullAccount(from), await this.getFullAccount(to)];
+    const chainProposeAccount = proposeAccount && (await this.getFullAccount(proposeAccount));
+
+    // get asset data
+    let chainAsset = await this.getAsset(asset);
+
+    // If we have a non-empty string memo and are configured to encrypt...
+    if (memo && encryptMemo) {
+      memoToPublicKey = chainTo.options.memo_key;
+
+      // Check for a null memo key, if the memo key is null use the receivers active key
+      if (/PPY1111111111111111111111111111111114T1Anm/.test(memoToPublicKey)) {
+        memoToPublicKey = chainTo.active.key_auths[0][0];
+      }
+    }
+
+    let proposeAcountId = proposeAccount ? chainProposeAccount.id : null;
+    let memoObject;
+
+    //=================================================================
+    // TODO: remove this once we have keys from Scatter to use instead
+    //=================================================================
+    const username = 'miigunner69';
+    const pw = 'QZvbzqGng8BMYzcFW4O5TpqJEwOXmy72O0ceLVwUqeuZ4grRnVmI';
+    const { privKeys } = Login.generateKeys(username, pw, ROLES, PREFIX);
+    // const memoPrivateKey = privKeys.memo;
+    const wifMemo = '5KQwCkL561FYfED6LiA6Z3NCvKdAPWPX1AbYVSEPsD3yANTnFjx';
+    const memoPrivateKey = this.privateFromWif(wifMemo);
+    const memoPublicKey = memoPrivateKey.toPublicKey().toPublicKeyString(PREFIX);
+    //=================================================================
+
+    if (memo && memoToPublicKey && memoPublicKey) {
+      let nonce = optional_nonce == null ? TransactionHelper.unique_nonce_uint64() : optional_nonce;
+
+      // TODO: fix so memo output type is Uint8Array(16)??
+      const message = Aes.encrypt_with_checksum(
+        memoPrivateKey, // From Private Key
+        memoToPublicKey, // To Public Key
+        nonce,
+        memo
+      );
+
+      memoObject = {
+        from: memoPublicKey, // From Public Key
+        to: memoToPublicKey, // To Public Key
+        nonce,
+        message,
+      };
+    }
+
+    // Allow user to choose asset with which to pay fees
+    let feeAsset = chainAsset;
+
+    // Default to CORE in case of faulty core_exchange_rate
+    if (
+      feeAsset.options.core_exchange_rate.base.asset_id === '1.3.0' &&
+      feeAsset.options.core_exchange_rate.quote.asset_id === '1.3.0'
+    ) {
+      feeAssetId = '1.3.0';
+    }
+
+    let tr = new TransactionBuilder();
+
+    let transferOp = tr.get_type_operation('transfer', {
+      fee: {
+        amount: 0,
+        asset_id: feeAssetId,
+      },
+      from: chainFrom.id,
+      to: chainTo.id,
+      amount: {
+        amount,
+        asset_id: chainAsset.id,
+      },
+      memo: memoObject,
+    });
+
+    if (proposeAccount) {
+      let proposalCreateOp = tr.get_type_operation('proposal_create', {
+        proposed_ops: [{ op: transferOp }],
+        fee_paying_account: proposeAcountId,
+      });
+      tr.add_operation(proposalCreateOp);
+      tr.operations[0][1].expiration_time = parseInt(Date.now() / 1000 + 5);
+    } else {
+      tr.add_operation(transferOp);
+    }
+
+    // Set the transaction fees for the new transaction
+    return await this.setRequiredFees(undefined, tr);
+  }
+
+  /**
+   * Add the keys needed to sign the transaction.
+   *
+   * @param {Object} transaction
+   * @param {Object} publicKey
+   * @param {boolean} [arbitrary=false]
+   * @param {boolean} [isHash=false]
+   * @param {Object} [privateKey=null]
+   * @returns {Object} transaction
+   * @memberof PPY
+   */
+  async signer(transaction, publicKey, arbitrary = false, isHash = false, privateKey = null) {
+    if (!publicKey && privateKey) {
+      publicKey = this.privateToPublic(privateKey);
+    }
+
+    // Sign the Peerplays transaction with private and public key
+    transaction.add_signer(privateKey, publicKey);
+
+    return transaction;
+
+    // if (!privateKey) privateKey = await KeyPairService.publicToPrivate(publicKey);
+    // if (!privateKey) return;
+
+    // if (typeof privateKey !== 'string') privateKey = this.bufferToHexPrivate(privateKey);
+
+    // if (arbitrary && isHash) return ecc.Signature.signHash(payload.data, privateKey).toString();
+    // return ecc.sign(Buffer.from(arbitrary ? payload.data : payload.buf, 'utf8'), privateKey);
+  }
+
+  /**
    * Finalize transaction.
    *
    * @param {Object} tr - TransactionBuilder instance.
@@ -886,8 +829,17 @@ export default class PPY extends Plugin {
     return tr;
   }
 
+  /**
+   * Sign the transaction with the keys in `signer_private_keys`
+   *
+   * @private
+   * @param {Object} tr
+   * @param {String} chainId
+   * @returns {Object} transaction
+   * @memberof PPY
+   */
   async _sign(tr, chainId) {
-    if(!tr || !chainId) {
+    if (!tr || !chainId) {
       throw new Error('_sign: Missing inputs');
     }
 
@@ -920,6 +872,14 @@ export default class PPY extends Plugin {
     return tr;
   }
 
+  /**
+   * Broadcast the transaction to the chain.
+   *
+   * @param {Object} tr - The transaction to broadcast.
+   * @param {*} was_broadcast_callback - The callback to execute once successfully broadcasted.
+   * @returns {Function||Error} was_broadcast_callback||new Error(...)
+   * @memberof PPY
+   */
   async broadcast(tr, was_broadcast_callback) {
     if (!tr || !was_broadcast_callback) {
       throw new Error('_broadcast: Missing inputs');
@@ -942,12 +902,12 @@ export default class PPY extends Plugin {
       throw new Error('no operations');
     }
 
-    let tr_object = ops.signed_transaction.toObject(tr);
+    let tr_object = ops.signed_transaction.toObject(tr); // serialize
 
-    return this._callChain(methods.BROADCAST, [(res) => res, tr_object], 'network_broadcast')
-      .then((data) => {
+    return this._callChain(methods.BROADCAST, [res => res, tr_object], 'network_broadcast')
+      .then(data => {
         if (was_broadcast_callback) {
-          console.log('res:', data)
+          console.log('res:', data);
           was_broadcast_callback();
         }
       })
@@ -969,5 +929,57 @@ export default class PPY extends Plugin {
             )}`
         );
       });
+  }
+
+  /**
+   * Perform transfer...
+   * TODO: ensure returns expected
+   *
+   * @param {{account: Object, to: String, amount: Number, memo: String, token: String, promptForSignature: Boolean}}
+   * @param {Object} testingKeys - If called via unit test, provide this.
+   * @memberof PPY
+   */
+  async transfer({ account, to, amount, memo, token, promptForSignature = true }, testingKeys) {
+    const from = account.name;
+    const publicActiveKey = account.publicKey;
+    const asset = token;
+
+    // Get the transaction
+    let transferTransaction = await this.getTransferTransaction(from, to, amount, memo, asset);
+
+    // Sign the transaction
+    if (promptForSignature) {
+      // transferTransaction = this.signerWithPopup(transferTransaction, account, )
+    } else {
+      transferTransaction = await this.signer(
+        transferTransaction,
+        publicActiveKey,
+        false,
+        false,
+        privateActiveKey
+      ); // TODO: need keys to work
+    }
+
+    if (testingKeys) {
+      const { pubActive, privActive } = testingKeys;
+
+      transferTransaction = await this.signer(
+        transferTransaction,
+        pubActive,
+        false,
+        false,
+        privActive
+      );
+    }
+
+    // Finalize the transaction
+    transferTransaction = await this.finalize(transferTransaction);
+
+    const callback = () => {
+      console.log('callback executing after broadcast');
+    };
+
+    // Broadcast the transaction
+    await this.broadcast(transferTransaction, callback);
   }
 }
