@@ -428,8 +428,6 @@ export default class PPY extends Plugin {
       throw new Error('getFee: No operation matching request');
     }
 
-    let fee;
-
     // Get the fee schedule
     const obj200 = await this.getObjects('2.0.0');
     const feeSchedule = obj200[0].parameters.current_fees.parameters;
@@ -696,10 +694,6 @@ export default class PPY extends Plugin {
     //=================================================================
     // TODO: remove this once we have keys from Scatter to use instead
     //=================================================================
-    const username = 'miigunner69';
-    const pw = 'QZvbzqGng8BMYzcFW4O5TpqJEwOXmy72O0ceLVwUqeuZ4grRnVmI';
-    const { privKeys } = Login.generateKeys(username, pw, ROLES, PREFIX);
-    // const memoPrivateKey = privKeys.memo;
     const wifMemo = '5KQwCkL561FYfED6LiA6Z3NCvKdAPWPX1AbYVSEPsD3yANTnFjx';
     const memoPrivateKey = this.privateFromWif(wifMemo);
     const memoPublicKey = memoPrivateKey.toPublicKey().toPublicKeyString(PREFIX);
@@ -830,8 +824,8 @@ export default class PPY extends Plugin {
         op[1] = op[1].finalize();
       }
 
-      let _type = ops.operation.st_operations[op[0]];
-      let hexBuffer = _type.toBuffer(op[1]).toString('hex');
+      // let _type = ops.operation.st_operations[op[0]];
+      // let hexBuffer = _type.toBuffer(op[1]).toString('hex');
       // console.log(
       //   'Operation %s: %O => %s (%d bytes)',
       //   _type.operation_name,

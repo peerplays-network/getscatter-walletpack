@@ -1,6 +1,5 @@
 'use strict';
 import { assert, expect } from 'chai';
-import { Login } from 'peerplaysjs-lib';
 require('isomorphic-fetch');
 
 const peerplays = new (require('../lib/peerplays').default)();
@@ -142,7 +141,7 @@ describe('peerplays', () => {
 
     let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
     tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active));
-    tr = await peerplays.finalize(tr);
+    await peerplays.finalize(tr);
 
     // no errors, test passes
   })
