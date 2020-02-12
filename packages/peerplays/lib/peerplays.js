@@ -946,6 +946,7 @@ export default class PPY extends Plugin {
    *
    * @param {{account: Object, to: String, amount: Number, memo: String, token: String, promptForSignature: Boolean}}
    * @param {Object} testingKeys - If called via unit test, provide this.
+   * @returns {Promise} resolve/reject - resolve with transaction id if we have one
    * @memberof PPY
    */
   async transfer({ account, to, amount, memo, token, promptForSignature = true }, testingKeys) {
@@ -989,6 +990,12 @@ export default class PPY extends Plugin {
     };
 
     // Broadcast the transaction
-    await this.broadcast(transferTransaction, callback);
+    return new Promise((resolve, reject) => {
+      this.broadcast(transferTransaction, callback).then(() => {
+        resolve(/* transaction_id */)
+      }).catch(err => {
+        reject(err);
+      });
+    });
   }
 }

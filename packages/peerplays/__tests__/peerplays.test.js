@@ -49,6 +49,22 @@ const transactionTest = {
   asset: '1.3.0'
 }
 
+// Used for tests requiring a Scatter account object
+const dummyAccount = {
+  keypairUnique:'thing',
+  networkUnique:'ppy:chain:1',
+  publicKey: TESTING_ACCOUNT.pubKeys.active,
+  name: TESTING_ACCOUNT.username,
+  authority: 'active',
+  fromOrigin: null,
+}
+
+// Used for tests requiring public and private keys
+const testingKeys = {
+  pubActive: TESTING_ACCOUNT.pubKeys.active,
+  privActive: peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active)
+}
+
 describe('peerplays', () => {
   // it.only('keyskeyskeys', async () => {
   //   const keys = Login.generateKeys(TESTING_ACCOUNT.username, TESTING_ACCOUNT.password, ['owner', 'active', 'memo'], 'TEST');
@@ -144,23 +160,11 @@ describe('peerplays', () => {
   it('should successfully broadcast a signed transaction WITHOUT a memo(transfer)', async () => {
     const {to, amount, memo, asset} = transactionTest;
 
-    const dummyAccount = {
-      keypairUnique:'thing',
-      networkUnique:'ppy:chain:1',
-      publicKey: TESTING_ACCOUNT.pubKeys.active,
-      name: TESTING_ACCOUNT.username,
-      authority: 'active',
-      fromOrigin: null,
-    }
-
-    const testingKeys = {
-      pubActive: TESTING_ACCOUNT.pubKeys.active,
-      privActive: peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active)
-    }
-
-    await peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys);
-
-    // no errors, test passes
+    return peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys).then(res => {
+      console.log(res);
+    }).catch(err => {
+      console.error(err);
+    });
   });
 
   it('should successfully broadcast a signed transaction WITH a memo(transfer)', async () => {
@@ -181,8 +185,10 @@ describe('peerplays', () => {
       privActive: peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active)
     }
 
-    await peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys);
-
-    // no errors, test passes
+    return peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys).then(res => {
+      console.log(res);
+    }).catch(err => {
+      console.error(err);
+    });
   });
 });
