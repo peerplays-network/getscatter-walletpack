@@ -41,6 +41,14 @@ const charlieTester = {
 // If using a non mainnet account, provide account data above and change the assignment below.
 const TESTING_ACCOUNT = charlieTester; // don't forget to update the endpoint in use in peerplays.js if using a non-mainnet account
 
+const transactionTest = {
+  from: 'init0',
+  to: 'init1',
+  amount: 100000,
+  memo: '',
+  asset: '1.3.0'
+}
+
 describe('peerplays', () => {
   // it.only('keyskeyskeys', async () => {
   //   const keys = Login.generateKeys(TESTING_ACCOUNT.username, TESTING_ACCOUNT.password, ['owner', 'active', 'memo'], 'TEST');
@@ -96,35 +104,25 @@ describe('peerplays', () => {
   });
 
   it('should successfully build a transfer transaction object with no memo', async () => {
-    const from = 'init0';
-    const to = 'init1';
-    const amount = 10000;
-    const memo = '';
-    const asset = '1.3.0';
+    const {from, to, amount, memo, asset} = transactionTest;
 
     // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
-    const tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
-    expect(tr.operations[0][1].fee.amount).to.not.be.empty;
+    const tr = await peerplays.getTransferTransaction(from, to, amount, memo ? memo : '', asset);
+    assert(tr.operations[0][1].fee.amount > 0);
   });
 
   it('should successfully build a transfer transaction object with a memo', async () => {
-    const from = 'init0';
-    const to = 'init1';
-    const amount = 10000;
+    const {from, to, amount, asset} = transactionTest;
     const memo = 'test memo';
-    const asset = '1.3.0';
 
     // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
-    const tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
-    expect(tr.operations[0][1].fee.amount).to.not.be.empty;
+    let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
+    assert(tr.operations[0][1].fee.amount > 0);
   });
 
   it('should successfully sign a transaction (signer)', async () => {
-    const from = 'init0';
-    const to = 'init1';
-    const amount = 10000;
+    const {from, to, amount, asset} = transactionTest;
     const memo = 'test memo';
-    const asset = '1.3.0';
 
     let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
     tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active));
@@ -133,11 +131,8 @@ describe('peerplays', () => {
   });
 
   it('should successfully finalize a signed transaction (finalize)', async () => {
-    const from = 'init0';
-    const to = 'init1';
-    const amount = 10000;
+    const {from, to, amount, asset} = transactionTest;
     const memo = 'test memo';
-    const asset = '1.3.0';
 
     let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
     tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active));
@@ -147,10 +142,7 @@ describe('peerplays', () => {
   })
 
   it('should successfully broadcast a signed transaction WITHOUT a memo(transfer)', async () => {
-    const to = 'init1';
-    const amount = 100000;
-    const memo = '';
-    const asset = '1.3.0';
+    const {to, amount, memo, asset} = transactionTest;
 
     const dummyAccount = {
       keypairUnique:'thing',
@@ -172,10 +164,8 @@ describe('peerplays', () => {
   });
 
   it('should successfully broadcast a signed transaction WITH a memo(transfer)', async () => {
-    const to = 'init1';
-    const amount = 100000;
+    const {to, amount, asset} = transactionTest;
     const memo = 'test memo';
-    const asset = '1.3.0';
 
     const dummyAccount = {
       keypairUnique:'thing',
