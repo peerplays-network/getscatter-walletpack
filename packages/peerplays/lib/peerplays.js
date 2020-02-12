@@ -439,7 +439,6 @@ export default class PPY extends Plugin {
   }
 
   /**
-   * TODO: incomplete
    * By providing a transaction builder instance transaction and the asset to use for the fees, this function will
    * return the fees associated with all operations within said transaction object instance.
    *
@@ -643,7 +642,6 @@ export default class PPY extends Plugin {
   }
 
   /**
-   * TODO: incomplete
    * Construct an unsigned transaction for a transfer operation with correct fees.
    *
    * @param {Object} args - Required params for the construction of the transaction and its operations.
@@ -710,7 +708,6 @@ export default class PPY extends Plugin {
     if (memo && memoToPublicKey && memoPublicKey) {
       let nonce = optional_nonce == null ? TransactionHelper.unique_nonce_uint64() : optional_nonce;
 
-      // TODO: fix so memo output type is Uint8Array(16)??
       const message = Aes.encrypt_with_checksum(
         memoPrivateKey, // From Private Key
         memoToPublicKey, // To Public Key
