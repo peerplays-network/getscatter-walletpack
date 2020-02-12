@@ -133,7 +133,6 @@ describe('peerplays', () => {
     assert(tr.signer_private_keys.length > 0);
   });
 
-  // TODO: incomplete test, add assertions
   it('should successfully finalize a signed transaction (finalize)', async () => {
     const from = 'init0';
     const to = 'init1';
@@ -145,7 +144,7 @@ describe('peerplays', () => {
     tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active));
     tr = await peerplays.finalize(tr);
 
-    // const tr = await peerplays.transfer({from, to, amount, memo, token: asset})
+    // no errors, test passes
   })
 
   it('should successfully broadcast a signed transaction WITHOUT a memo(transfer)', async () => {
@@ -169,6 +168,8 @@ describe('peerplays', () => {
     }
 
     await peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys);
+
+    // no errors, test passes
   });
 
   it('should successfully broadcast a signed transaction WITH a memo(transfer)', async () => {
@@ -192,5 +193,7 @@ describe('peerplays', () => {
     }
 
     await peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys);
+
+    // no errors, test passes
   });
 });
