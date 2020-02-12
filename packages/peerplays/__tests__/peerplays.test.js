@@ -3,6 +3,7 @@ import { assert, expect } from 'chai';
 require('isomorphic-fetch');
 
 const peerplays = new (require('../lib/peerplays').default)();
+const _PPY = require('../lib/_PPY').default;
 const RandomString = require('randomstring');
 
 // Mainnet testing account
@@ -41,6 +42,7 @@ const charlieTester = {
 // If using a non mainnet account, provide account data above and change the assignment below.
 const TESTING_ACCOUNT = charlieTester; // don't forget to update the endpoint in use in peerplays.js if using a non-mainnet account
 
+// Used for transaction testing
 const transactionTest = {
   from: 'init0',
   to: 'init1',
@@ -62,17 +64,10 @@ const dummyAccount = {
 // Used for tests requiring public and private keys
 const testingKeys = {
   pubActive: TESTING_ACCOUNT.pubKeys.active,
-  privActive: peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active)
+  privActive: _PPY.privateFromWif(TESTING_ACCOUNT.wifs.active)
 }
 
 describe('peerplays', () => {
-  // it.only('keyskeyskeys', async () => {
-  //   const keys = Login.generateKeys(TESTING_ACCOUNT.username, TESTING_ACCOUNT.password, ['owner', 'active', 'memo'], 'TEST');
-  //   console.log('owner wif: ', peerplays.wifFromPrivate(keys.privKeys.owner))
-  //   console.log('active wif: ', peerplays.wifFromPrivate(keys.privKeys.active))
-  //   console.log('memo wif: ', peerplays.wifFromPrivate(keys.privKeys.memo))
-  // })
-
   it('should convert a private key WIF to it\'s public key (privateToPublic)', async () => {
     const [wif, prefix, publicKey] = [TESTING_ACCOUNT.wifs.active, TESTING_ACCOUNT.prefix, TESTING_ACCOUNT.pubKeys.active]
     assert(peerplays.privateToPublic(wif, prefix) === publicKey, 'Bad public key');
@@ -81,22 +76,22 @@ describe('peerplays', () => {
   it('should convert a private key WIF to it\'s PrivateKey counterpart (privateFromWif)', async () => {
     const ppy = peerplays;
     const wif = TESTING_ACCOUNT.wifs.active;
-    const pk = peerplays.privateFromWif(wif);
+    const pk = _PPY.privateFromWif(wif);
     assert(ppy.privateToPublic(ppy.wifFromPrivate(pk), TESTING_ACCOUNT.prefix) === TESTING_ACCOUNT.pubKeys.active);
   })
 
   it('should be able to retrieve a Peerplays accounts keys', async () => {
     const username = 'init1';
-    assert.typeOf(await peerplays.getAccountKeys(username), 'object');
+    assert.typeOf(await _PPY.getAccountKeys(username), 'object');
   });
 
   it('should be able to retrieve a full Peerplays account', async () => {
     const username = 'init1';
-    assert.typeOf(await peerplays.getFullAccount(username), 'object');
+    assert.typeOf(await _PPY.getFullAccount(username), 'object');
   });
 
   it('should successfully authorize a Peerplays account', async () => {
-    assert.equal(await peerplays.authUser(TESTING_ACCOUNT.username, TESTING_ACCOUNT.password), true);
+    assert.equal(await _PPY.authUser(TESTING_ACCOUNT.username, TESTING_ACCOUNT.password), true);
   });
 
   it('should attempt to register a new Peerplays account', async () => {
@@ -114,7 +109,7 @@ describe('peerplays', () => {
     //   `Testing registration with following data: \nusername: ${username} \npassword: ${password}`
     // );
 
-    const response = await peerplays.register(1, username, password);
+    const response = await _PPY.register(1, username, password);
     // console.log(response) // to check if the register worked ie: might have hit the ip limit or an account name restricted chars error
     assert.typeOf(response, 'object');
   });
@@ -123,7 +118,7 @@ describe('peerplays', () => {
     const {from, to, amount, memo, asset} = transactionTest;
 
     // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
-    const tr = await peerplays.getTransferTransaction(from, to, amount, memo ? memo : '', asset);
+    const tr = await _PPY.getTransferTransaction(from, to, amount, memo ? memo : '', asset);
     assert(tr.operations[0][1].fee.amount > 0);
   });
 
@@ -132,7 +127,7 @@ describe('peerplays', () => {
     const memo = 'test memo';
 
     // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
-    let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
+    let tr = await _PPY.getTransferTransaction(from, to, amount, memo, asset);
     assert(tr.operations[0][1].fee.amount > 0);
   });
 
@@ -140,8 +135,8 @@ describe('peerplays', () => {
     const {from, to, amount, asset} = transactionTest;
     const memo = 'test memo';
 
-    let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
-    tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active));
+    let tr = await _PPY.getTransferTransaction(from, to, amount, memo, asset);
+    tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, _PPY.privateFromWif(TESTING_ACCOUNT.wifs.active));
 
     assert(tr.signer_private_keys.length > 0);
   });
@@ -150,9 +145,9 @@ describe('peerplays', () => {
     const {from, to, amount, asset} = transactionTest;
     const memo = 'test memo';
 
-    let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
-    tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active));
-    await peerplays.finalize(tr);
+    let tr = await _PPY.getTransferTransaction(from, to, amount, memo, asset);
+    tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, _PPY.privateFromWif(TESTING_ACCOUNT.wifs.active));
+    await _PPY.finalize(tr);
 
     // no errors, test passes
   })
@@ -170,20 +165,6 @@ describe('peerplays', () => {
   it('should successfully broadcast a signed transaction WITH a memo(transfer)', async () => {
     const {to, amount, asset} = transactionTest;
     const memo = 'test memo';
-
-    const dummyAccount = {
-      keypairUnique:'thing',
-      networkUnique:'ppy:chain:1',
-      publicKey: TESTING_ACCOUNT.pubKeys.active,
-      name: TESTING_ACCOUNT.username,
-      authority: 'active',
-      fromOrigin: null,
-    }
-
-    const testingKeys = {
-      pubActive: TESTING_ACCOUNT.pubKeys.active,
-      privActive: peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active)
-    }
 
     return peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys).then(res => {
       console.log(res);
