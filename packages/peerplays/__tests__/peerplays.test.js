@@ -148,8 +148,30 @@ describe('peerplays', () => {
     // const tr = await peerplays.transfer({from, to, amount, memo, token: asset})
   })
 
-  // ONLY WORKING WITH EMPTY MEMO, NODE OUTPUTTING DIFFERENT ENCRYPTED MEMO FORMAT
-  it.only('should successfully broadcast a signed transaction (transfer)', async () => {
+  it('should successfully broadcast a signed transaction WITHOUT a memo(transfer)', async () => {
+    const to = 'init1';
+    const amount = 100000;
+    const memo = '';
+    const asset = '1.3.0';
+
+    const dummyAccount = {
+      keypairUnique:'thing',
+      networkUnique:'ppy:chain:1',
+      publicKey: TESTING_ACCOUNT.pubKeys.active,
+      name: TESTING_ACCOUNT.username,
+      authority: 'active',
+      fromOrigin: null,
+    }
+
+    const testingKeys = {
+      pubActive: TESTING_ACCOUNT.pubKeys.active,
+      privActive: peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active)
+    }
+
+    await peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys);
+  });
+
+  it('should successfully broadcast a signed transaction WITH a memo(transfer)', async () => {
     const to = 'init1';
     const amount = 100000;
     const memo = 'test memo';
@@ -169,6 +191,6 @@ describe('peerplays', () => {
       privActive: peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active)
     }
 
-    const tr = await peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys);
+    await peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys);
   });
 });

@@ -407,7 +407,7 @@ export default class PPY extends Plugin {
     if (!ops || !assetId) {
       throw new Error('getRequiredFees: Missing inputs');
     }
-    return await this._callChain(methods.GET_REQUIRED_FEES, [[ops], assetId]);
+    return await this._callChain(methods.GET_REQUIRED_FEES, [ops, assetId]);
   }
 
   /**
@@ -471,35 +471,55 @@ export default class PPY extends Plugin {
       }
     }
 
-    let totalFee = 0;
-    const fees = await this.getFees('transfer');
-    const {fee, price_per_kbyte} = fees;
-    console.log(`fee: ${fee} price_per_kbyte: ${price_per_kbyte}`)
+    let fees = await this.getRequiredFees(operations, assetId);
 
-    totalFee = fee;
-
-    // If there is a memo, we must calculate the price/kb on its message contents
-    if (tr.operations[0][1].memo) {
-      // get size of the memo in bytes
-      let memoBuf = tr.operations[0][1].memo.message;
-      let arrayBuf = memoBuf.buffer.slice(memoBuf.byteOffset, memoBuf.byteOffset + memoBuf.byteLength);
-      let typedArr = new Uint32Array(memoBuf.buffer, memoBuf.byteOffset, memoBuf.byteLength / Uint32Array.BYTES_PER_ELEMENT);
-      console.log('typedarr', typedArr.length)
-      const memoByteSize = tr.operations[0][1].memo.message.length;
-      totalFee += ((memoByteSize/1024) * price_per_kbyte);
-      console.log('totalFee:',totalFee)
-
-      let _type = ops.operation.st_operations[0];
-      console.log('SIZE:', _type.toBuffer(tr.operations[0][1]).length/2);
-      let hexBuffer = _type.toBuffer(tr.operations[0][1]).toString('hex');
-      let size = hexBuffer.length / 2;
-      // totalFee = (size*price_per_kbyte)/1024;
-      console.log('hexBuffer',hexBuffer.length / 2);
+    if (assetId !== '1.3.0') {
+      feePool = dynamicObject ? dynamicObject[0].fee_pool : 0;
+      let totalFees = 0;
+      for (let j = 0, fee; j < coreFees.length; j++) {
+        fee = coreFees[j];
+        totalFees += fee.amount;
+      }
+      if (totalFees > parseInt(feePool, 10)) {
+        fees = coreFees;
+        assetId = '1.3.0';
+      }
     }
 
-    // "test memo" = 89843. total transfer fee with memo "test memo" = 2089843
-    // getting: 15625, total: 2015625
-    tr.operations[0][1].fee = {amount: totalFee, asset_id: assetId};
+    // Proposed transactions need to be flattened
+    let flatAssets = [];
+
+    let flatten = obj => {
+      if (Array.isArray(obj)) {
+        for (let k = 0, len = obj.length; k < len; k++) {
+          let item = obj[k];
+          flatten(item);
+        }
+      } else {
+        flatAssets.push(obj);
+      }
+    };
+
+    flatten(fees);
+
+    let assetIndex = 0;
+
+    let setFee = operation => {
+      if (
+        !operation.fee ||
+        operation.fee.amount === 0 ||
+        (operation.fee.amount.toString && operation.fee.amount.toString() === '0') // Long
+      ) {
+        operation.fee = flatAssets[assetIndex];
+        // console.log("new operation.fee", operation.fee)
+      }
+      assetIndex++;
+      return operation.fee;
+    };
+
+    for (let i = 0; i < operations.length; i++) {
+      tr.operations[0][1].fee = setFee(operations[i][1]);
+    }
 
     return tr;
   }
@@ -907,7 +927,6 @@ export default class PPY extends Plugin {
     return this._callChain(methods.BROADCAST, [res => res, tr_object], 'network_broadcast')
       .then(data => {
         if (was_broadcast_callback) {
-          console.log('res:', data);
           was_broadcast_callback();
         }
       })
