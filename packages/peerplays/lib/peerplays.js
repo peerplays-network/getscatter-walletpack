@@ -7,7 +7,6 @@ import KeyPairService from '@walletpack/core/services/secure/KeyPairService';
 import Token from '@walletpack/core/models/Token';
 import HardwareService from '@walletpack/core/services/secure/HardwareService';
 import StoreService from '@walletpack/core/services/utility/StoreService';
-import TokenService from '@walletpack/core/services/utility/TokenService';
 import EventService from '@walletpack/core/services/utility/EventService';
 import SigningService from '@walletpack/core/services/secure/SigningService';
 import ecc from 'eosjs-ecc';
@@ -17,12 +16,16 @@ const fetch = require('node-fetch');
 import {
   Aes,
   ChainValidation,
+  ChainConfig,
+  ChainTypes,
+  hash,
   Login,
   ops,
   PublicKey,
   PrivateKey as Pkey,
+  Signature,
   TransactionBuilder,
-  TransactionHelper
+  TransactionHelper,
 } from 'peerplaysjs-lib';
 
 //TO-DO: Replace with Peerplays explorer.
@@ -39,19 +42,32 @@ const methods = {
   GET_FULL_ACCOUNTS: 'get_full_accounts',
   GET_ACCOUNTS: 'get_accounts',
   GET_ASSET: 'lookup_asset_symbols',
+  GET_CHAIN_ID: 'get_chain_id',
   BROADCAST: 'broadcast_transaction_with_callback',
 };
 
-const roles = ['owner', 'active', 'memo'];
+const ROLES = ['owner', 'active', 'memo'];
 
-const MAINNET_CHAIN_ID = '6b6b5f0ce7a36d323768e534f3edb41c6d6332a541a95725b98e28d140850134'; // alice
-const TESTNET_CHAIN_ID = 'b3f7fe1e5ad0d2deca40a626a4404524f78e65c3a48137551c33ea4e7c365672'; // beatrice
+const MAINNET_CHAIN_ID = '6b6b5f0ce7a36d323768e534f3edb41c6d6332a541a95725b98e28d140850134';
 
 const MAINNET_ENDPOINT_1 = 'https://pma.blockveritas.co/ws';
-const MAINNET_FAUCET = 'https://faucet.peerplays.download/faucet';
-const PREFIX = 'PPY';
+const MAINNET_FAUCET = 'https://faucet.peerplays.download/api/v1/accounts';
 
-let isLegacy = false;
+const TESTNET_ENDPOINT_1 = '';
+const TESTNET_FAUCET = '';
+
+const DEFAULT_PREFIX = 'PPY';
+const TESTNET_PREFIX = 'TEST';
+
+// Override these for testnets
+const PREFIX = TESTNET_PREFIX;
+const ENDPOINT = TESTNET_ENDPOINT_1;
+const FAUCET = TESTNET_FAUCET;
+
+if (PREFIX !== DEFAULT_PREFIX) {
+  ChainConfig.setPrefix(PREFIX);
+}
+
 let cachedInstances;
 
 export default class PPY extends Plugin {
@@ -110,8 +126,8 @@ export default class PPY extends Plugin {
     return network.blockchain === 'ppy' && network.chainId === endorsedNetwork.chainId;
   }
 
-  async getChainId(network) {
-    return 1;
+  async getChainId() {
+    return await this._callChain(methods.GET_CHAIN_ID, []);
   }
 
   usesResources() {
@@ -139,7 +155,9 @@ export default class PPY extends Plugin {
   }
 
   privateToPublic(privateKeyWif, prefix = null) {
-    return this.privateFromWif(privateKeyWif).toPublicKey().toString(prefix ? prefix : 'PPY');
+    return this.privateFromWif(privateKeyWif)
+      .toPublicKey()
+      .toPublicKeyString(prefix ? prefix : 'PPY');
   }
 
   validPrivateKey(privateKey) {
@@ -155,7 +173,7 @@ export default class PPY extends Plugin {
   }
 
   bufferToHexPrivate(buffer) {
-    const bufKey = Pkey.fromBuffer(Buffer.from(buffer))
+    const bufKey = Pkey.fromBuffer(Buffer.from(buffer));
     return bufKey.toWif();
   }
 
@@ -167,20 +185,12 @@ export default class PPY extends Plugin {
     return false;
   }
 
-  async defaultDecimals(assetId) {
-    const asset = await this.getAsset(assetId);
-    return asset.precision || 5;
+  defaultDecimals() {
+    return 5; // ui does not call this async so we have to hardcode
   }
 
-  async defaultToken() {
-    return new Token(
-      Blockchains.PPY,
-      'ppy',
-      'PPY',
-      'PPY',
-      await this.defaultDecimals('1.3.0'),
-      MAINNET_CHAIN_ID
-    );
+  defaultToken() {
+    return new Token(Blockchains.PPY, 'ppy', 'PPY', 'PPY', 5, MAINNET_CHAIN_ID);
   }
 
   actionParticipants(payload) {
@@ -193,7 +203,7 @@ export default class PPY extends Plugin {
    * Returns an array of Token class.
    */
   async balancesFor(account, tokens, fallback = false) {
-    let fullAccount = await this.getFullAccount(account.name);
+    let fullAccount = await this.getFullAccountObject(account.name);
     let unformattedBalance;
     let tokenArray = [];
     let assetId = '1.3.0';
@@ -229,7 +239,7 @@ export default class PPY extends Plugin {
    * Returns a Token class where `token.amount` is the balance.
    */
   async balanceFor(account, token) {
-    let fullAccount = await this.getFullAccount(account.name);
+    let fullAccount = await this.getFullAccountObject(account.name);
     let unformattedBalance;
     let assetId = '1.3.0';
 
@@ -245,24 +255,6 @@ export default class PPY extends Plugin {
     const clone = token.clone();
     clone.amount = balance;
     return clone;
-  }
-
-  async signer(transaction, publicKey, arbitrary = false, isHash = false, privateKey = null) {
-    if (!publicKey && privateKey) {
-      publicKey = this.privateToPublic(privateKey);
-    }
-
-    // Sign the Peerplays transaction with private and public key
-    transaction.add_signer(privateKey, publicKey)
-    return transaction;
-
-    // if (!privateKey) privateKey = await KeyPairService.publicToPrivate(publicKey);
-    // if (!privateKey) return;
-
-    // if (typeof privateKey !== 'string') privateKey = this.bufferToHexPrivate(privateKey);
-
-    // if (arbitrary && isHash) return ecc.Signature.signHash(payload.data, privateKey).toString();
-    // return ecc.sign(Buffer.from(arbitrary ? payload.data : payload.buf, 'utf8'), privateKey);
   }
 
   async signerWithPopup(payload, account, rejector) {
@@ -311,28 +303,35 @@ export default class PPY extends Plugin {
    * @returns {*} - The data from the request OR an error if there is one.
    * @memberof PPY
    */
-  async _callChain(method, params) {
+  async _callChain(method, params, api = 'database') {
     const fetchBody = JSON.stringify({
-      "method": "call",
-      "params": [
-        "database",
-        method,
-        params
-      ],
-      "jsonrpc": "2.0",
-      "id": 1
+      method: 'call',
+      params: [api, method, params],
+      jsonrpc: '2.0',
+      id: 1,
     });
 
-    return await fetch(MAINNET_ENDPOINT_1, {
+    return await fetch(ENDPOINT, {
       body: fetchBody,
       method: 'POST',
       headers: {
-        'Accept': 'application/json',
-        'Content-type': 'application/json'
-      }
-    }).catch(err => {
-      throw new Error(err);
-    }).then(res => res.json()).then(res => res.result);
+        Accept: 'application/json',
+        'Content-type': 'application/json',
+      },
+    })
+      .catch(err => {
+        throw new Error(err);
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (res.result) return res.result;
+
+        if (res.error) {
+          throw new Error(res.error.message);
+        }
+
+        return res;
+      });
   }
 
   /**
@@ -362,7 +361,7 @@ export default class PPY extends Plugin {
     if (!objIds || objIds.length === 0) {
       throw new Error('getObjects: Missing inputs');
     }
-    return await this._callChain(methods.GET_OBJECTS, [objIds]);
+    return await this._callChain(methods.GET_OBJECTS, [[objIds]]);
   }
 
   /**
@@ -381,6 +380,21 @@ export default class PPY extends Plugin {
   }
 
   /**
+   * Requests from Peerplays blockchain for full object.
+   *
+   * @param {String} accountNameOrId - The Peerplays account username to request data for.
+   * @returns {Object}
+   * @memberof PPY
+   */
+  async getFullAccountObject(accountNameOrId) {
+    if (!accountNameOrId) {
+      throw new Error('getFullAccount: Missing input');
+    }
+    const res = await this._callChain(methods.GET_FULL_ACCOUNTS, [[accountNameOrId], true]);
+    return res[0][1];
+  }
+
+  /**
    * Used by setRequiredFees.
    *
    * @param {Array} ops - The operations within a TransactionBuilder instance.
@@ -392,7 +406,33 @@ export default class PPY extends Plugin {
     if (!ops || !assetId) {
       throw new Error('getRequiredFees: Missing inputs');
     }
-    return await this._callChain(methods.GET_REQUIRED_FEES, [[ops], assetId]);
+    return await this._callChain(methods.GET_REQUIRED_FEES, [ops, assetId]);
+  }
+
+  /**
+   * Get the requires fees associated with an operation.
+   *
+   * @param {String} opToPrice
+   * @returns {Object} fees
+   * @memberof PPY
+   */
+  async getFees(opToPrice) {
+    if (!opToPrice) {
+      throw new Error('getFee: Missing inputs');
+    }
+
+    const op = ChainTypes.operations[opToPrice];
+
+    if (op === undefined) {
+      throw new Error('getFee: No operation matching request');
+    }
+
+    // Get the fee schedule
+    const obj200 = await this.getObjects('2.0.0');
+    const feeSchedule = obj200[0].parameters.current_fees.parameters;
+
+    // Return the fees associated with `opToPrice`
+    return feeSchedule[op][1];
   }
 
   /**
@@ -427,91 +467,178 @@ export default class PPY extends Plugin {
       }
     }
 
-    let promises = [await this.getRequiredFees(operations, assetId)];
+    let fees = await this.getRequiredFees(operations, assetId);
 
     if (assetId !== '1.3.0') {
-      // This handles the fallback to paying fees in BTS if the fee pool is empty.
-      promises.push(await this.getRequiredFees(operations, '1.3.0'));
-      promises.push(await this.getObjects('1.3.0'));
+      feePool = dynamicObject ? dynamicObject[0].fee_pool : 0;
+      let totalFees = 0;
+      for (let j = 0, fee; j < coreFees.length; j++) {
+        fee = coreFees[j];
+        totalFees += fee.amount;
+      }
+      if (totalFees > parseInt(feePool, 10)) {
+        fees = coreFees;
+        assetId = '1.3.0';
+      }
     }
 
-    return Promise.all(promises).then(res => {
-      let [fees, coreFees, asset] = res,
-        dynamicPromise;
-      asset = asset ? asset[0] : null;
+    // Proposed transactions need to be flattened
+    let flatAssets = [];
 
-      dynamicPromise =
-        assetId !== '1.3.0' && asset
-          ? this.getObjects(asset.dynamic_asset_data_id)
-          : new Promise(resolve => resolve());
-
-      return dynamicPromise.then(dynamicObject => {
-        if (assetId !== '1.3.0') {
-          feePool = dynamicObject ? dynamicObject[0].fee_pool : 0;
-          let totalFees = 0;
-
-          for (let j = 0, fee; j < coreFees.length; j++) {
-            fee = coreFees[j];
-            totalFees += fee.amount;
-          }
-
-          if (totalFees > parseInt(fee_pool, 10)) {
-            fees = coreFees;
-            assetId = '1.3.0';
-          }
+    let flatten = obj => {
+      if (Array.isArray(obj)) {
+        for (let k = 0, len = obj.length; k < len; k++) {
+          let item = obj[k];
+          flatten(item);
         }
+      } else {
+        flatAssets.push(obj);
+      }
+    };
 
-        // Proposed transactions need to be flattened
-        let flatAssets = [];
+    flatten(fees);
 
-        let flatten = obj => {
-          if (Array.isArray(obj)) {
-            for (let k = 0, len = obj.length; k < len; k++) {
-              let item = obj[k];
-              flatten(item);
-            }
-          } else {
-            flatAssets.push(obj);
-          }
-        };
+    let assetIndex = 0;
 
-        flatten(fees);
+    let setFee = operation => {
+      if (
+        !operation.fee ||
+        operation.fee.amount === 0 ||
+        (operation.fee.amount.toString && operation.fee.amount.toString() === '0') // Long
+      ) {
+        operation.fee = flatAssets[assetIndex];
+        // console.log("new operation.fee", operation.fee)
+      }
+      assetIndex++;
+      return operation.fee;
+    };
 
-        let assetIndex = 0;
+    for (let i = 0; i < operations.length; i++) {
+      tr.operations[0][1].fee = setFee(operations[i][1]);
+    }
 
-        let setFee = operation => {
-          if (
-            !operation.fee ||
-            operation.fee.amount === 0 ||
-            (operation.fee.amount.toString && operation.fee.amount.toString() === '0') // Long
-          ) {
-            operation.fee = flatAssets[assetIndex];
-          }
-
-          assetIndex++;
-
-          if (operation.proposed_ops) {
-            let result = [];
-
-            for (let y = 0; y < operation.proposed_ops.length; y++) {
-              result.push(set_fee(operation.proposed_ops[y].op[1]));
-            }
-
-            return result;
-          }
-        };
-
-        for (let i = 0; i < operations.length; i++) {
-          setFee(operations[i][1]);
-        }
-
-        return tr;
-      });
-    });
+    return tr;
   }
 
   /**
-   * TODO: incomplete
+   * Requests a users' public keys from the Peerplays blockchain.
+   * Keys are returned as an array with key order of owner, active, then memo.
+   *
+   * @param {String} accountNameOrId - ie: 'mcs' || '1.2.26'
+   * @returns {Array} keys - [ownerPublicKey, activePublicKey, memoPublicKey]
+   */
+  async getAccountKeys(accountNameOrId) {
+    const keys = {};
+    const account = await this.getFullAccount(accountNameOrId);
+    ROLES.forEach(role => {
+      let key;
+
+      if (role === 'memo') {
+        key = [[account.options.memo_key, 1]];
+      } else {
+        key = account[role].key_auths;
+      }
+
+      keys[role] = key;
+    });
+
+    return keys;
+  }
+
+  /**
+   * peerplaysjs-lib.Login will generate keys from provided data and compare them with the ones pulled from the
+   * Peerplays blockchain (`userPubKeys`).
+   *
+   * @param {String} username - The login username to associate with the account to be registered.
+   * @param {String} password - The login password to associate with the account to be registered.
+   * @returns {Boolean}
+   */
+  async authUser(username, password) {
+    // Ensure the Login class has the correct roles configured.
+    Login.setRoles(ROLES);
+
+    const userPubKeys = await this.getAccountKeys(username);
+
+    const user = {
+      accountName: username,
+      password,
+      auths: userPubKeys,
+    };
+
+    // TODO: modify this such that the Scatter UI has the data it requires to import an existing account. Likely will require to generate keys and return them to something
+    const authed = Login.checkKeys(user, PREFIX);
+
+    return authed;
+  }
+
+  /**
+   * Will generate keys from username and password via the peerplaysjs-lib.
+   * The public keys for owner, active, and memo are then sent to the faucet that handles account registrations for the configured chain.
+   * Once keys are generated and adequate data is provided, a register attempt will be made to the configured faucet endpoint.
+   * A Peerplays account password should be generated via randomstring npm package.
+   *
+   * @param {Number} attempt - The number of attempts to start off with.
+   * @param {String} username - The login username to associate with the account to be registered.
+   * @param {String} password - The login password to associate with the account to be registered.
+   * @param {String} referral - Optional referral Peerplays account username.
+   * @returns {Object} - The account data that was registered if successful or associated error if registration failed ie:
+   * {
+   *   account: {
+   *     active_key: 'TEST6vw2TA6QXTXWHeoRhq6Sv7F4Pdq5fNkddBGbrY31iCRjEDZnby',
+   *     memo_key: 'TEST8C7kCkp6rd3UP4ayVS2o2WyEh9MgrY2Ud4b8SXCWEUfBAspNa6',
+   *     name: 'mcs4455',
+   *     owner_key: 'TEST7HERrHiogdB5749RahGDKoMHhK3qbwvWABvqpVARrY76b2qcTM',
+   *     referrer: 'nathan'
+   *  }
+   * }
+   * @memberof PPY
+   */
+  async register(attempt, username, password, referral = null) {
+    Login.setRoles(ROLES);
+    let keys = Login.generateKeys(username, password, ROLES, PREFIX);
+    const [ownerPub, activePub, memoPub] = [
+      keys.pubKeys.owner,
+      keys.pubKeys.active,
+      keys.pubKeys.memo,
+    ];
+
+    if (!attempt || !username || !password) {
+      throw new Error('register: Missing inputs');
+    }
+
+    const fetchBody = JSON.stringify({
+      account: {
+        name: username,
+        owner_key: ownerPub,
+        active_key: activePub,
+        memo_key: memoPub,
+        refcode: referral || '',
+        referrer: referral,
+      },
+    });
+
+    // We use a separate fetch here as we want this to potentially have multiple tries.
+    return await fetch(FAUCET, {
+      method: 'post',
+      mode: 'cors',
+      headers: {
+        Accept: 'application/json',
+        'Content-type': 'application/json',
+      },
+      body: fetchBody,
+    })
+      .then(res => res.json())
+      .catch(err => {
+        if (attempt > 2) {
+          throw new Error(err);
+        } else {
+          attempt++;
+          return this.register(attempt, username, password);
+        }
+      });
+  }
+
+  /**
    * Construct an unsigned transaction for a transfer operation with correct fees.
    *
    * @param {Object} args - Required params for the construction of the transaction and its operations.
@@ -526,7 +653,16 @@ export default class PPY extends Plugin {
    * @returns {Object} - A TransactionBuilder transaction instance with fees set on the transaction for a transfer operation.
    * @memberof PPY
    */
-  async getTransferTransaction(from, to, amount, memo, asset, proposeAccount = null, encryptMemo = true, optional_nonce = null) {
+  async getTransferTransaction(
+    from,
+    to,
+    amount,
+    memo,
+    asset,
+    proposeAccount = null,
+    encryptMemo = true,
+    optional_nonce = null
+  ) {
     let feeAssetId = asset;
     if (!from || !to || !amount || !asset) {
       throw new Error('transfer: Missing inputs');
@@ -557,29 +693,26 @@ export default class PPY extends Plugin {
     //=================================================================
     // TODO: remove this once we have keys from Scatter to use instead
     //=================================================================
-    const username = 'sample'
-    const pw = 'sample-password'
-    const { privKeys, pubKeys } = Login.generateKeys(username, pw, roles, PREFIX);
-    const memoPrivateKey = privKeys.memo;
-    const memoPublicKey = pubKeys.memo;
+    const wifMemo = '5KQwCkL561FYfED6LiA6Z3NCvKdAPWPX1AbYVSEPsD3yANTnFjx';
+    const memoPrivateKey = this.privateFromWif(wifMemo);
+    const memoPublicKey = memoPrivateKey.toPublicKey().toPublicKeyString(PREFIX);
     //=================================================================
+
     if (memo && memoToPublicKey && memoPublicKey) {
       let nonce = optional_nonce == null ? TransactionHelper.unique_nonce_uint64() : optional_nonce;
+
+      const message = Aes.encrypt_with_checksum(
+        memoPrivateKey, // From Private Key
+        memoToPublicKey, // To Public Key
+        nonce,
+        memo
+      );
 
       memoObject = {
         from: memoPublicKey, // From Public Key
         to: memoToPublicKey, // To Public Key
         nonce,
-        message: encryptMemo
-          ? Aes.encrypt_with_checksum(
-              memoPrivateKey, // From Private Key
-              memoToPublicKey, // To Public Key
-              nonce,
-              memo
-            )
-          : Buffer.isBuffer(memo)
-          ? memo.toString('utf-8')
-          : memo,
+        message,
       };
     }
 
@@ -622,32 +755,189 @@ export default class PPY extends Plugin {
     }
 
     // Set the transaction fees for the new transaction
-    return this.setRequiredFees('1.3.0', tr).then(tr => tr);
+    return await this.setRequiredFees(undefined, tr);
   }
 
   /**
-   * Requests a users' public keys from the Peerplays blockchain.
-   * Keys are returned as an array with key order of owner, active, then memo.
+   * Add the keys needed to sign the transaction.
    *
-   * @param {String} accountNameOrId - ie: 'mcs' || '1.2.26'
-   * @returns {Array} keys - [ownerPublicKey, activePublicKey, memoPublicKey]
+   * @param {Object} transaction
+   * @param {Object} publicKey
+   * @param {boolean} [arbitrary=false]
+   * @param {boolean} [isHash=false]
+   * @param {Object} [privateKey=null]
+   * @returns {Object} transaction
+   * @memberof PPY
    */
-  async getAccountKeys(accountNameOrId) {
-    const keys = {};
-    const account = await this.getFullAccount(accountNameOrId);
-    roles.forEach(role => {
-      let key;
+  async signer(transaction, publicKey, arbitrary = false, isHash = false, privateKey = null) {
+    if (!publicKey && privateKey) {
+      publicKey = this.privateToPublic(privateKey);
+    }
 
-      if (role === 'memo') {
-        key = [[account.options.memo_key, 1]];
-      } else {
-        key = account[role].key_auths;
+    // Sign the Peerplays transaction with private and public key
+    transaction.add_signer(privateKey, publicKey);
+
+    return transaction;
+
+    // if (!privateKey) privateKey = await KeyPairService.publicToPrivate(publicKey);
+    // if (!privateKey) return;
+
+    // if (typeof privateKey !== 'string') privateKey = this.bufferToHexPrivate(privateKey);
+
+    // if (arbitrary && isHash) return ecc.Signature.signHash(payload.data, privateKey).toString();
+    // return ecc.sign(Buffer.from(arbitrary ? payload.data : payload.buf, 'utf8'), privateKey);
+  }
+
+  /**
+   * Finalize transaction.
+   *
+   * @param {Object} tr - TransactionBuilder instance.
+   * @returns {Object} - tr
+   * @memberof PPY
+   */
+  async finalize(tr) {
+    if (tr.signer_private_keys.length < 1) {
+      throw new Error('not signed');
+    }
+
+    if (tr.tr_buffer) {
+      throw new Error('already finalized');
+    }
+
+    const obj210 = await this._callChain(methods.GET_OBJECTS, [['2.1.0']]);
+    tr.head_block_time_string = obj210[0].time;
+
+    if (tr.expiration === 0) {
+      tr.expiration = tr.base_expiration_sec() + ChainConfig.expire_in_secs;
+    }
+
+    tr.ref_block_num = obj210[0].head_block_number & 0xffff;
+    tr.ref_block_prefix = Buffer.from(obj210[0].head_block_id, 'hex').readUInt32LE(4);
+
+    let iterable = tr.operations;
+
+    for (let i = 0, len = iterable.length; i < len; i++) {
+      let op = iterable[i];
+
+      if (op[1].finalize) {
+        op[1] = op[1].finalize();
       }
 
-      keys[role] = key;
-    });
+      // let _type = ops.operation.st_operations[op[0]];
+      // let hexBuffer = _type.toBuffer(op[1]).toString('hex');
+      // console.log(
+      //   'Operation %s: %O => %s (%d bytes)',
+      //   _type.operation_name,
+      //   op[1],
+      //   hexBuffer,
+      //   hexBuffer.length / 2
+      // );
+    }
 
-    return keys;
+    tr.tr_buffer = ops.transaction.toBuffer(tr);
+
+    return tr;
+  }
+
+  /**
+   * Sign the transaction with the keys in `signer_private_keys`
+   *
+   * @private
+   * @param {Object} tr
+   * @param {String} chainId
+   * @returns {Object} transaction
+   * @memberof PPY
+   */
+  async _sign(tr, chainId) {
+    if (!tr || !chainId) {
+      throw new Error('_sign: Missing inputs');
+    }
+
+    if (!tr.tr_buffer) {
+      throw new Error('not finalized');
+    }
+
+    if (tr.signatures.length > 0) {
+      throw new Error('already signed');
+    }
+
+    if (!tr.signer_private_keys.length) {
+      throw new Error('Transaction was not signed. Do you have a private key? [no_signers]');
+    }
+
+    let end = tr.signer_private_keys.length;
+
+    for (let i = 0; end > 0 ? i < end : i > end; i++) {
+      let [private_key, public_key] = tr.signer_private_keys[i];
+      let sig = Signature.signBuffer(
+        Buffer.concat([Buffer.from(chainId, 'hex'), tr.tr_buffer]),
+        private_key,
+        public_key
+      );
+      tr.signatures.push(sig.toBuffer());
+    }
+
+    tr.signer_private_keys = [];
+    tr.signed = true;
+    return tr;
+  }
+
+  /**
+   * Broadcast the transaction to the chain.
+   *
+   * @param {Object} tr - The transaction to broadcast.
+   * @param {*} was_broadcast_callback - The callback to execute once successfully broadcasted.
+   * @returns {Function||Error} was_broadcast_callback||new Error(...)
+   * @memberof PPY
+   */
+  async broadcast(tr, was_broadcast_callback) {
+    if (!tr || !was_broadcast_callback) {
+      throw new Error('_broadcast: Missing inputs');
+    }
+
+    if (tr.signatures.length < 1) {
+      const chainId = await this.getChainId();
+      tr = await this._sign(tr, chainId);
+    }
+
+    if (!tr.tr_buffer) {
+      throw new Error('not finalized');
+    }
+
+    if (!tr.signatures.length) {
+      throw new Error('not signed');
+    }
+
+    if (!tr.operations.length) {
+      throw new Error('no operations');
+    }
+
+    let tr_object = ops.signed_transaction.toObject(tr); // serialize
+
+    return this._callChain(methods.BROADCAST, [res => res, tr_object], 'network_broadcast')
+      .then(data => {
+        if (was_broadcast_callback) {
+          was_broadcast_callback();
+        }
+      })
+      .catch(error => {
+        console.log(error);
+        let { message } = error;
+
+        if (!message) {
+          message = '';
+        }
+
+        throw new Error(
+          `${message}\n` +
+            'peerplays-crypto ' +
+            ` digest ${hash
+              .sha256(tr.tr_buffer)
+              .toString('hex')} transaction ${tr.tr_buffer.toString('hex')} ${JSON.stringify(
+              tr_object
+            )}`
+        );
+      });
   }
 
   /**
@@ -655,9 +945,10 @@ export default class PPY extends Plugin {
    * TODO: ensure returns expected
    *
    * @param {{account: Object, to: String, amount: Number, memo: String, token: String, promptForSignature: Boolean}}
+   * @param {Object} testingKeys - If called via unit test, provide this.
    * @memberof PPY
    */
-  async transfer({account, to, amount, memo, token, promptForSignature = true}) {
+  async transfer({ account, to, amount, memo, token, promptForSignature = true }, testingKeys) {
     const from = account.name;
     const publicActiveKey = account.publicKey;
     const asset = token;
@@ -669,106 +960,35 @@ export default class PPY extends Plugin {
     if (promptForSignature) {
       // transferTransaction = this.signerWithPopup(transferTransaction, account, )
     } else {
-      transferTransaction = this.signer(transferTransaction, publicActiveKey, false, false, privateActiveKey); // TODO: need keys to work
+      transferTransaction = await this.signer(
+        transferTransaction,
+        publicActiveKey,
+        false,
+        false,
+        privateActiveKey
+      ); // TODO: need keys to work
     }
 
-    // Broadcast the transaction
-    transferTransaction.broadcast(data => data).catch(err => {
-      return {error: err};
-    });
-  }
+    if (testingKeys) {
+      const { pubActive, privActive } = testingKeys;
 
-  /**
-   * peerplaysjs-lib.Login will generate keys from provided data and compare them with the ones pulled from the
-   * Peerplays blockchain (`userPubKeys`).
-   *
-   * @param {String} username - The login username to associate with the account to be registered.
-   * @param {String} password - The login password to associate with the account to be registered.
-   * @param {String} prefix - Optional prefix.
-   * @returns {Boolean}
-   */
-  async authUser(username, password, prefix = 'PPY') {
-    // Ensure the Login class has the correct roles configured.
-    Login.setRoles(roles);
+      transferTransaction = await this.signer(
+        transferTransaction,
+        pubActive,
+        false,
+        false,
+        privActive
+      );
+    }
 
-    const userPubKeys = await this.getAccountKeys(username);
+    // Finalize the transaction
+    transferTransaction = await this.finalize(transferTransaction);
 
-    const user = {
-      accountName: username,
-      password,
-      auths: userPubKeys,
+    const callback = () => {
+      console.log('callback executing after broadcast');
     };
 
-    // TODO: modify this such that the Scatter UI has the data it requires to import an existing account. Likely will require to generate keys and return them to something
-    const authed = Login.checkKeys(user, prefix);
-
-    return authed;
-  }
-
-  /**
-   * Will generate keys from username and password via the peerplaysjs-lib.
-   * The public keys for owner, active, and memo are then sent to the faucet that handles account registrations for the configured chain.
-   * Once keys are generated and adequate data is provided, a register attempt will be made to the configured faucet endpoint.
-   * A Peerplays account password should be generated via randomstring npm package.
-   *
-   * @param {Number} attempt - The number of attempts to start off with.
-   * @param {String} username - The login username to associate with the account to be registered.
-   * @param {String} password - The login password to associate with the account to be registered.
-   * @param {String} referral - Optional referral Peerplays account username.
-   * @returns {Object} - The account data that was registered if successful or associated error if registration failed ie:
-   * {
-   *   account: {
-   *     active_key: 'TEST6vw2TA6QXTXWHeoRhq6Sv7F4Pdq5fNkddBGbrY31iCRjEDZnby',
-   *     memo_key: 'TEST8C7kCkp6rd3UP4ayVS2o2WyEh9MgrY2Ud4b8SXCWEUfBAspNa6',
-   *     name: 'mcs4455',
-   *     owner_key: 'TEST7HERrHiogdB5749RahGDKoMHhK3qbwvWABvqpVARrY76b2qcTM',
-   *     referrer: 'nathan'
-   *  }
-   * }
-   * @memberof PPY
-   */
-  async register(attempt, username, password, referral = null) {
-    Login.setRoles(roles);
-    let keys = Login.generateKeys(username, password, roles, PREFIX);
-    const [ownerPub, activePub, memoPub] = [
-      keys.pubKeys.owner,
-      keys.pubKeys.active,
-      keys.pubKeys.memo,
-    ];
-
-    if (!attempt || !username || !password) {
-      throw new Error('register: Missing inputs');
-    }
-
-    const fetchBody = JSON.stringify({
-      account: {
-        name: username,
-        owner_key: ownerPub,
-        active_key: activePub,
-        memo_key: memoPub,
-        refcode: referral || '',
-        referrer: referral,
-      },
-    });
-
-    // We use a separate fetch here as we want this to potentially have multiple tries.
-    return await fetch(MAINNET_FAUCET, {
-      method: 'post',
-      mode: 'cors',
-      headers: {
-        Accept: 'application/json',
-        'Content-type': 'application/json',
-      },
-      body: fetchBody,
-    })
-      .then(res => res.json())
-      .catch(err => {
-        if (attempt > 2) {
-          throw new Error(err);
-        } else {
-          attempt++;
-          return this.register(attempt, username, password);
-        }
-      });
+    // Broadcast the transaction
+    await this.broadcast(transferTransaction, callback);
   }
 }

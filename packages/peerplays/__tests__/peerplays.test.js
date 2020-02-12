@@ -22,21 +22,41 @@ const mainnetTester = {
   prefix: 'PPY'
 };
 
-// If using a non mainnet account, provide account data above and change the assignment below.
-const TESTING_ACCOUNT = mainnetTester; // don't forget to update the endpoint in use in peerplays.js if using a non-mainnet account
+const charlieTester = {
+  username: 'miigunner69',
+  password: 'QZvbzqGng8BMYzcFW4O5TpqJEwOXmy72O0ceLVwUqeuZ4grRnVmI',
+  wifs: {
+    owner: '5KYZrFyX3YTMjBYJTrbQcs7DSPvFTa4JqdebpoGckP4SarptipG',
+    active: '5JDuvHrcj66Ts5af1NLH3XbdTqepTwbNCJYuLyh1j2QGMztArsS',
+    memo: '5KQwCkL561FYfED6LiA6Z3NCvKdAPWPX1AbYVSEPsD3yANTnFjx'
+  },
+  pubKeys: {
+    owner: 'TEST8ThZBscv57ZZtxnDndkkv6gfnbJ8ybabU4YxwfjFMoxSoXwoYA',
+    active: 'TEST5cygheeaKf7PodjGcJRXbn4wWhKAYyi7uyVe6uaMtEL4CawKpv',
+    memo: 'TEST5LTXoKUtawewrMaqEduF5gAQwbwSS6MbtEKdXYMTjekTq5m3JW'
+  },
+  prefix: 'TEST'
+};
 
-// TODO: remove?
-// account keys for 'unit39'
-// const KEYPAIR = Keypair.fromJson({
-//   privateKey: mainnetTester.wifs.active,
-//   blockchains: [Blockchains.PPY],
-//   publicKeys: [{
-//     key: 'PPY8QGhjBytYZrHpmDorLM4ETsoDYXGbGH3WT8sTrhu3LUJQ9ePf5', // active
-//     blockchain: Blockchains.PPY
-//   }]
-// });
+// If using a non mainnet account, provide account data above and change the assignment below.
+const TESTING_ACCOUNT = charlieTester; // don't forget to update the endpoint in use in peerplays.js if using a non-mainnet account
+
+const transactionTest = {
+  from: 'init0',
+  to: 'init1',
+  amount: 100000,
+  memo: '',
+  asset: '1.3.0'
+}
 
 describe('peerplays', () => {
+  // it.only('keyskeyskeys', async () => {
+  //   const keys = Login.generateKeys(TESTING_ACCOUNT.username, TESTING_ACCOUNT.password, ['owner', 'active', 'memo'], 'TEST');
+  //   console.log('owner wif: ', peerplays.wifFromPrivate(keys.privKeys.owner))
+  //   console.log('active wif: ', peerplays.wifFromPrivate(keys.privKeys.active))
+  //   console.log('memo wif: ', peerplays.wifFromPrivate(keys.privKeys.memo))
+  // })
+
   it('should convert a private key WIF to it\'s public key (privateToPublic)', async () => {
     const [wif, prefix, publicKey] = [TESTING_ACCOUNT.wifs.active, TESTING_ACCOUNT.prefix, TESTING_ACCOUNT.pubKeys.active]
     assert(peerplays.privateToPublic(wif, prefix) === publicKey, 'Bad public key');
@@ -46,7 +66,7 @@ describe('peerplays', () => {
     const ppy = peerplays;
     const wif = TESTING_ACCOUNT.wifs.active;
     const pk = peerplays.privateFromWif(wif);
-    assert(ppy.privateToPublic(ppy.wifFromPrivate(pk)) === TESTING_ACCOUNT.pubKeys.active);
+    assert(ppy.privateToPublic(ppy.wifFromPrivate(pk), TESTING_ACCOUNT.prefix) === TESTING_ACCOUNT.pubKeys.active);
   })
 
   it('should be able to retrieve a Peerplays accounts keys', async () => {
@@ -60,7 +80,7 @@ describe('peerplays', () => {
   });
 
   it('should successfully authorize a Peerplays account', async () => {
-    assert.equal(await peerplays.authUser(mainnetTester.username, mainnetTester.password), true);
+    assert.equal(await peerplays.authUser(TESTING_ACCOUNT.username, TESTING_ACCOUNT.password), true);
   });
 
   it('should attempt to register a new Peerplays account', async () => {
@@ -84,49 +104,85 @@ describe('peerplays', () => {
   });
 
   it('should successfully build a transfer transaction object with no memo', async () => {
-    const from = 'init0';
-    const to = 'init1';
-    const amount = 10000;
-    const memo = '';
-    const asset = '1.3.0';
+    const {from, to, amount, memo, asset} = transactionTest;
 
     // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
-    const tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
-    expect(tr.operations[0][1].fee.amount).to.not.be.empty;
+    const tr = await peerplays.getTransferTransaction(from, to, amount, memo ? memo : '', asset);
+    assert(tr.operations[0][1].fee.amount > 0);
   });
 
   it('should successfully build a transfer transaction object with a memo', async () => {
-    const from = 'init0';
-    const to = 'init1';
-    const amount = 10000;
+    const {from, to, amount, asset} = transactionTest;
     const memo = 'test memo';
-    const asset = '1.3.0';
 
     // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
-    const tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
-    expect(tr.operations[0][1].fee.amount).to.not.be.empty;
+    let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
+    assert(tr.operations[0][1].fee.amount > 0);
   });
 
   it('should successfully sign a transaction (signer)', async () => {
-    const from = 'init0';
-    const to = 'init1';
-    const amount = 10000;
+    const {from, to, amount, asset} = transactionTest;
     const memo = 'test memo';
-    const asset = '1.3.0';
-    // sample transfer transaction
+
     let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
     tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active));
 
     assert(tr.signer_private_keys.length > 0);
   });
 
-  // it('should successfully broadcast a signed transaction (transfer)', async () => {
-  //   const from = 'init0';
-  //   const to = 'init1';
-  //   const amount = 10000;
-  //   const memo = 'test memo';
-  //   const asset = '1.3.0';
+  it('should successfully finalize a signed transaction (finalize)', async () => {
+    const {from, to, amount, asset} = transactionTest;
+    const memo = 'test memo';
 
-  //   const tr = await peerplays.transfer({from, to, amount, memo, token: asset})
-  // })
+    let tr = await peerplays.getTransferTransaction(from, to, amount, memo, asset);
+    tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active));
+    await peerplays.finalize(tr);
+
+    // no errors, test passes
+  })
+
+  it('should successfully broadcast a signed transaction WITHOUT a memo(transfer)', async () => {
+    const {to, amount, memo, asset} = transactionTest;
+
+    const dummyAccount = {
+      keypairUnique:'thing',
+      networkUnique:'ppy:chain:1',
+      publicKey: TESTING_ACCOUNT.pubKeys.active,
+      name: TESTING_ACCOUNT.username,
+      authority: 'active',
+      fromOrigin: null,
+    }
+
+    const testingKeys = {
+      pubActive: TESTING_ACCOUNT.pubKeys.active,
+      privActive: peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active)
+    }
+
+    await peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys);
+
+    // no errors, test passes
+  });
+
+  it('should successfully broadcast a signed transaction WITH a memo(transfer)', async () => {
+    const {to, amount, asset} = transactionTest;
+    const memo = 'test memo';
+
+    const dummyAccount = {
+      keypairUnique:'thing',
+      networkUnique:'ppy:chain:1',
+      publicKey: TESTING_ACCOUNT.pubKeys.active,
+      name: TESTING_ACCOUNT.username,
+      authority: 'active',
+      fromOrigin: null,
+    }
+
+    const testingKeys = {
+      pubActive: TESTING_ACCOUNT.pubKeys.active,
+      privActive: peerplays.privateFromWif(TESTING_ACCOUNT.wifs.active)
+    }
+
+    await peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys);
+
+    // no errors, test passes
+  });
 });
