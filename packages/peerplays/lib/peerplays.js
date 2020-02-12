@@ -185,9 +185,8 @@ export default class PPY extends Plugin {
     return false;
   }
 
-  async defaultDecimals(assetId) {
-    const asset = await this.getAsset(assetId);
-    return asset.precision || 5;
+  defaultDecimals() {
+    return 5; // ui does not call this async so we have to hardcode
   }
 
   defaultToken() {
