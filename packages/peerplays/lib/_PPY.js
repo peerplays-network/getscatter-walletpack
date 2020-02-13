@@ -42,6 +42,24 @@ if (PREFIX !== DEFAULT_PREFIX) {
 
 export default class _PPY {
   /**
+   * Convert a human readable token/asset amount into a blockchain number (no decimals)
+   * ie: `1` is `100000` on chain for an asset/token with precision of 5.
+   *
+   * @static
+   * @param {String||Number} amount
+   * @param {Object} token
+   * @returns {Number}
+   * @memberof _PPY
+   */
+  static convertToChainAmount(amount, token) {
+    if (!amount || !token) {
+      throw new Error('convertToChainAmount: Missing inputs')
+    }
+
+    return parseFloat(amount) * Math.pow(10, token.decimals);
+  }
+
+  /**
    * Fetch the Peerplays blockchain for data.
    *
    * @static
@@ -124,6 +142,13 @@ export default class _PPY {
     return await _PPY.callChain(methods.GET_OBJECTS, [[objIds]]);
   }
 
+  /**
+   * Request the chain id.
+   *
+   * @static
+   * @returns {String}
+   * @memberof _PPY
+   */
   static async getChainId() {
     return await this.callChain(methods.GET_CHAIN_ID, []);
   }
