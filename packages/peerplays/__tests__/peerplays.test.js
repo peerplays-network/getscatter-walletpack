@@ -46,9 +46,10 @@ const TESTING_ACCOUNT = charlieTester; // don't forget to update the endpoint in
 const transactionTest = {
   from: 'init0',
   to: 'init1',
-  amount: 100000,
+  amount: 1,
   memo: '',
-  asset: '1.3.0'
+  asset: '1.3.0',
+  token: peerplays.defaultToken()
 }
 
 // Used for tests requiring a Scatter account object
@@ -114,17 +115,21 @@ describe('peerplays', () => {
     assert.typeOf(response, 'object');
   });
 
-  it('should successfully build a transfer transaction object with no memo', async () => {
-    const {from, to, amount, memo, asset} = transactionTest;
+  it('should successfully build a transfer transaction object WITHOUT a memo', async () => {
+    const {from, to, token, memo, asset} = transactionTest;
+    let {amount} = transactionTest;
+    amount = _PPY.convertToChainAmount(amount, token);
 
     // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
     const tr = await _PPY.getTransferTransaction(from, to, amount, memo ? memo : '', asset);
     assert(tr.operations[0][1].fee.amount > 0);
   });
 
-  it('should successfully build a transfer transaction object with a memo', async () => {
-    const {from, to, amount, asset} = transactionTest;
+  it('should successfully build a transfer transaction object WITH a memo', async () => {
+    const {from, to, token, asset} = transactionTest;
+    let {amount} = transactionTest;
     const memo = 'test memo';
+    amount = _PPY.convertToChainAmount(amount, token);
 
     // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
     let tr = await _PPY.getTransferTransaction(from, to, amount, memo, asset);
@@ -132,8 +137,10 @@ describe('peerplays', () => {
   });
 
   it('should successfully sign a transaction (signer)', async () => {
-    const {from, to, amount, asset} = transactionTest;
+    const {from, to, token, asset} = transactionTest;
+    let {amount} = transactionTest;
     const memo = 'test memo';
+    amount = _PPY.convertToChainAmount(amount, token);
 
     let tr = await _PPY.getTransferTransaction(from, to, amount, memo, asset);
     tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, _PPY.privateFromWif(TESTING_ACCOUNT.wifs.active));
@@ -142,8 +149,10 @@ describe('peerplays', () => {
   });
 
   it('should successfully finalize a signed transaction (finalize)', async () => {
-    const {from, to, amount, asset} = transactionTest;
+    const {from, to, token, asset} = transactionTest;
+    let {amount} = transactionTest;
     const memo = 'test memo';
+    amount = _PPY.convertToChainAmount(amount, token);
 
     let tr = await _PPY.getTransferTransaction(from, to, amount, memo, asset);
     tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, _PPY.privateFromWif(TESTING_ACCOUNT.wifs.active));
@@ -153,20 +162,22 @@ describe('peerplays', () => {
   })
 
   it('should successfully broadcast a signed transaction WITHOUT a memo(transfer)', async () => {
-    const {to, amount, memo, asset} = transactionTest;
+    const {to, token, amount, memo} = transactionTest;
+    token.amount = amount;
 
-    return peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys).then(res => {
+    return peerplays.transfer({account: dummyAccount, to, amount, memo, token}, testingKeys).then(res => {
       console.log(res);
     }).catch(err => {
       console.error(err);
     });
   });
 
-  it('should successfully broadcast a signed transaction WITH a memo(transfer)', async () => {
-    const {to, amount, asset} = transactionTest;
+  it.only('should successfully broadcast a signed transaction WITH a memo(transfer)', async () => {
+    const {to, token, amount} = transactionTest;
     const memo = 'test memo';
+    token.amount = amount;
 
-    return peerplays.transfer({account: dummyAccount, to, amount, memo, token: asset}, testingKeys).then(res => {
+    return peerplays.transfer({account: dummyAccount, to, amount, memo, token}, testingKeys).then(res => {
       console.log(res);
     }).catch(err => {
       console.error(err);
