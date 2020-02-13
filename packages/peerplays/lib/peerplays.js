@@ -301,10 +301,9 @@ export default class PPY extends Plugin {
   async transfer({ account, to, amount, memo, token, promptForSignature = true }, testingKeys) {
     const from = account.name;
     const publicActiveKey = account.publicKey;
-    const asset = token;
 
     // Get the transaction
-    let transferTransaction = await _PPY.getTransferTransaction(from, to, amount, memo, asset);
+    let transferTransaction = await _PPY.getTransferTransaction(from, to, amount, memo, '1.3.0');
 
     // Sign the transaction
     if (promptForSignature) {
