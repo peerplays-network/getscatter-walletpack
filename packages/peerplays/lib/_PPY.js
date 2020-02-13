@@ -81,7 +81,6 @@ export default class _PPY {
       method: 'POST',
       headers: {
         Accept: 'application/json',
-        'Content-type': 'application/json',
       },
     })
       .catch(err => {
