@@ -28,6 +28,7 @@ const EXPLORER = {
   block: 'https://peerplaysblockchain.info/block/{x}',
 };
 
+const MAINNET_CHAIN_ID = '6b6b5f0ce7a36d323768e534f3edb41c6d6332a541a95725b98e28d140850134';
 let cachedInstances;
 
 export default class PPY extends Plugin {
