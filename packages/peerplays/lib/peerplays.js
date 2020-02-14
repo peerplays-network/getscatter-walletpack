@@ -306,19 +306,23 @@ export default class PPY extends Plugin {
     // Get the transaction
     let transferTransaction = await _PPY.getTransferTransaction(from, to, amount, memo, '1.3.0');
 
+    let privateActiveKey = await KeyPairService.publicToPrivate(account.publicKey);
+    privateActiveKey = _PPY.privateFromWif(privateActiveKey);
+
     // Sign the transaction
-    if (promptForSignature) {
+    if (!promptForSignature) {
       // transferTransaction = this.signerWithPopup(transferTransaction, account, )
     } else {
-      transferTransaction = await _PPY.signer(
+      transferTransaction = await this.signer(
         transferTransaction,
         publicActiveKey,
         false,
         false,
         privateActiveKey
-      ); // TODO: need keys to work
+      );
     }
 
+    // For testing
     if (testingKeys) {
       const { pubActive, privActive } = testingKeys;
 
@@ -327,7 +331,7 @@ export default class PPY extends Plugin {
         pubActive,
         false,
         false,
-        privActive
+        _PPY.privateFromWif(privActive)
       );
     }
 
@@ -341,7 +345,7 @@ export default class PPY extends Plugin {
     // Broadcast the transaction
     return new Promise((resolve, reject) => {
       _PPY.broadcast(transferTransaction, callback).then(() => {
-        resolve(/* transaction_id */)
+        resolve(transferTransaction.tr_buffer.toString('hex'));
       }).catch(err => {
         reject(err);
       });
