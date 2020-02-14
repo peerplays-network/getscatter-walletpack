@@ -23,6 +23,11 @@ export default class TransferService {
         return this.baseTransfer(params);
     }
 
+    static async [Blockchains.PPY](params){
+    	params.recipient = params.recipient.toLowerCase();
+        return this.baseTransfer(params);
+    }
+
     static async baseTransfer(params){
         let {account, recipient, amount, memo, token } = params;
         const plugin = PluginRepository.plugin(account.blockchain());
@@ -55,7 +60,8 @@ export default class TransferService {
 		    case Blockchains.EOSIO: return transfer.transaction_id;
 		    case Blockchains.TRX: return transfer.txID;
 		    case Blockchains.ETH: return transfer.transactionHash;
-		    case Blockchains.BTC: return transfer.txid;
+            case Blockchains.BTC: return transfer.txid;
+            case Blockchains.PPY: return transfer;
 	    }
 	    return null;
     }

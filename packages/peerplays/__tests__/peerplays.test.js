@@ -68,7 +68,7 @@ const dummyAccount = {
 // Used for tests requiring public and private keys
 const testingKeys = {
   pubActive: TESTING_ACCOUNT.pubKeys.active,
-  privActive: _PPY.privateFromWif(TESTING_ACCOUNT.wifs.active)
+  privActive: TESTING_ACCOUNT.wifs.active
 }
 
 describe('peerplays', () => {
