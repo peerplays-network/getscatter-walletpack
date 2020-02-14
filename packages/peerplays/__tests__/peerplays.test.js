@@ -1,5 +1,8 @@
 'use strict';
 import { assert, expect } from 'chai';
+import PPYKeypairService from '../lib/PPYKeypairService';
+import { Login } from 'peerplaysjs-lib';
+
 require('isomorphic-fetch');
 
 const peerplays = new (require('../lib/peerplays').default)();
@@ -172,7 +175,7 @@ describe('peerplays', () => {
     });
   });
 
-  it.only('should successfully broadcast a signed transaction WITH a memo(transfer)', async () => {
+  it('should successfully broadcast a signed transaction WITH a memo(transfer)', async () => {
     const {to, token, amount} = transactionTest;
     const memo = 'test memo';
     token.amount = amount;
@@ -183,4 +186,23 @@ describe('peerplays', () => {
       console.error(err);
     });
   });
+
+  it('should generate a Keypair instance successfully with a decryptable "master" private key', async () => {
+    const {privKeys} = Login.generateKeys(TESTING_ACCOUNT.username, TESTING_ACCOUNT.password, ['owner', 'active', 'memo'], TESTING_ACCOUNT.prefix);
+    const wifs = {};
+
+    // Generate WIF for each private key (3 for each authority level).
+    for (const [authority, privKey] of Object.entries(privKeys)) {
+      wifs[authority] = peerplays.wifFromPrivate(privKey);
+    }
+
+    // You can assign other keypair instances to the returned keypair as it is an instance of Scatter KeyPair
+    // ie: keypair.blockchains = ['ppy']
+    const keypair = PPYKeypairService.newKeypair(wifs, TESTING_ACCOUNT.prefix);
+    const decryptedWifs = PPYKeypairService.getWifs(keypair);
+
+    assert(decryptedWifs.owner === TESTING_ACCOUNT.wifs.owner, 'owner key wif decrypt mismatch')
+    assert(decryptedWifs.active === TESTING_ACCOUNT.wifs.active, 'active key wif decrypt mismatch')
+    assert(decryptedWifs.memo === TESTING_ACCOUNT.wifs.memo, 'memo key wif decrypt mismatch')
+  })
 });
