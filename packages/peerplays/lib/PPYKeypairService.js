@@ -19,7 +19,7 @@ class CryptoHelper {
    *
    * @param {String} plainText - The string to be encrypted
    * @param {String} secret - The password that is needed to decrypt/encrypt.
-   * @returns
+   * @returns {String} - hex format string representing the encrypted value of `plainText`
    * @memberof CryptoHelper
    */
   encrypt(plainText, secret) {
@@ -80,7 +80,7 @@ export default class PPYKeypairService {
    * @static
    * @param {{owner: String, active: String, memo: String}} wifs - An object containing all Wallet Import Format (WIF) keys associated with a Peerplays acocunt.
    * @param {String} prefix - The chain prefix to use. Important for correct key generation.
-   * @returns
+   * @returns {Object} - Instance of Scatter Keypair
    * @memberof PPYKeypairService
    */
   static newKeypair(wifs, prefix) {
