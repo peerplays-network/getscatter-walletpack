@@ -89,9 +89,10 @@ export default class PPY extends Plugin {
   /**
    * Generate keys role=("owner"|"active"|"memo") from (password + accountName + role)
    *
-   * @param accountName String
-   * @param password String
-   * @param roles Array
+   * @param {String} accountName
+   * @param {String} password
+   * @param {Array} roles
+   * @param {String} prefix
    * @returns {Object} Keypair
    */
   generateKeys(accountName, password, roles = ['owner', 'active', 'memo'], prefix = 'TEST') {
