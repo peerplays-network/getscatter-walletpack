@@ -92,7 +92,7 @@ export default class PPY extends Plugin {
    * @param accountName String
    * @param password String
    * @param roles Array
-   * @returns Object of roles
+   * @returns {Object} Keypair
    */
   generateKeys(accountName, password, roles = ['owner', 'active', 'memo'], prefix = 'TEST') {
     const {privKeys} = Login.generateKeys(accountName, password, roles, prefix);
