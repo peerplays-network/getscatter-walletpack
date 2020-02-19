@@ -5,6 +5,7 @@ import { Blockchains } from '@walletpack/core/models/Blockchains';
 import Network from '@walletpack/core/models/Network';
 import KeyPairService from '@walletpack/core/services/secure/KeyPairService';
 import Token from '@walletpack/core/models/Token';
+import Account from '@walletpack/core/models/Account'
 import HardwareService from '@walletpack/core/services/secure/HardwareService';
 import StoreService from '@walletpack/core/services/utility/StoreService';
 import EventService from '@walletpack/core/services/utility/EventService';
@@ -15,10 +16,13 @@ const fetch = require('node-fetch');
 
 import {
   ChainValidation,
+  Login,
   PublicKey,
-  PrivateKey as Pkey
+  PrivateKey as Pkey,
+  key
 } from 'peerplaysjs-lib';
 import _PPY from './_PPY';
+import PPYKeypairService from './PPYKeypairService';
 
 //TO-DO: Replace with Peerplays explorer.
 const EXPLORER = {
@@ -82,6 +86,29 @@ export default class PPY extends Plugin {
     );
   }
 
+  /**
+   * Generate keys role=("owner"|"active"|"memo") from (password + accountName + role)
+   *
+   * @param {String} accountName
+   * @param {String} password
+   * @param {Array} roles
+   * @param {String} prefix
+   * @returns {Object} Keypair
+   */
+  generateKeys(accountName, password, roles = ['owner', 'active', 'memo'], prefix = 'TEST') {
+    const {privKeys} = Login.generateKeys(accountName, password, roles, prefix);
+    const wifs = {};
+
+    // Generate WIF for each private key (3 for each authority level).
+    for (const [authority, privKey] of Object.entries(privKeys)) {
+      wifs[authority] = this.wifFromPrivate(privKey);
+    }
+
+    // You can assign other keypair instances to the returned keypair as it is an instance of Scatter KeyPair
+    // ie: keypair.blockchains = ['ppy']
+    return PPYKeypairService.newKeypair(wifs, prefix);
+  }
+
   isEndorsedNetwork(network) {
     const endorsedNetwork = this.getEndorsedNetwork();
     return network.blockchain === 'ppy' && network.chainId === endorsedNetwork.chainId;
@@ -106,6 +133,38 @@ export default class PPY extends Plugin {
   isValidRecipient(name) {
     return ChainValidation.is_account_name(name);
   }
+
+  /**
+   *
+   *
+   * @param {Object} keypair
+   * @param {Object} network
+   * @returns {Promise} Account Object
+   * @memberof PPY
+   */
+  getImportableAccounts(keypair, network){
+		return new Promise((resolve, reject) => {
+      if(!keypair.username) {
+        console.error('no username');
+        return resolve([]);
+      }
+
+      if(!keypair.publicKeys) {
+        console.error('no publicKey')
+        return resolve([]);
+      }
+
+      let publicKey = keypair.publicKeys[0].key;
+
+      resolve([Account.fromJson({
+        name:keypair.username,
+        authority:'owner',
+        publicKey,
+        keypairUnique:keypair.unique(),
+        networkUnique:network.unique(),
+      })])
+})
+}
 
   privateToPublic(privateKeyWif, prefix = null) {
     return _PPY.privateFromWif(privateKeyWif)
@@ -305,9 +364,10 @@ export default class PPY extends Plugin {
 
     // Get the transaction
     let transferTransaction = await _PPY.getTransferTransaction(from, to, amount, memo, '1.3.0');
+    let privateActiveKey = await KeyPairService.publicToPrivatePPY(account.publicKey);
+    const wifs = PPYKeypairService.getWifs(privateActiveKey, publicActiveKey);
 
-    let privateActiveKey = await KeyPairService.publicToPrivate(account.publicKey);
-    privateActiveKey = _PPY.privateFromWif(privateActiveKey);
+    privateActiveKey = _PPY.privateFromWif(wifs.active);
 
     // Sign the transaction
     if (!promptForSignature) {
