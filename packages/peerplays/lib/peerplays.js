@@ -139,7 +139,7 @@ export default class PPY extends Plugin {
       if(!keypair.username) {
         console.log('no username');
         return resolve([]);
-      } 
+      }
 
       if(!keypair.publicKeys) {
         console.log('no publicKey')
@@ -148,15 +148,15 @@ export default class PPY extends Plugin {
 
       let publicKey = keypair.publicKeys[0].key;
 
-				resolve([Account.fromJson({
-					name:keypair.username,
-					authority:'owner',
-					publicKey,
-					keypairUnique:keypair.unique(),
-					networkUnique:network.unique(),
-				})])
-		})
-	}
+      resolve([Account.fromJson({
+        name:keypair.username,
+        authority:'owner',
+        publicKey,
+        keypairUnique:keypair.unique(),
+        networkUnique:network.unique(),
+      })])
+})
+}
 
   privateToPublic(privateKeyWif, prefix = null) {
     return _PPY.privateFromWif(privateKeyWif)
