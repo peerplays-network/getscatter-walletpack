@@ -125,4 +125,31 @@ describe('peerplays core', () => {
       })
   });
 
+  it.only('should generate a valid account object after import', async () => {
+    // Dummy Data
+    const testNetwork = Network.fromJson({
+      blockchain:'ppy',
+      name:'Test',
+      host:'test.net/api',
+      protocol:'https',
+      chainId:'1',
+    });
+
+    const testKeypair = Keypair.fromJson({
+      name: 'Testing key',
+      publicKeys: [
+        { blockchain: Blockchains.PPY, key: 'PPY74mnbzYG9WRVL9NQM39LQZw6sJ9WQguqp4kJm8NcQ8tGhXNa2r' },
+      ],
+      privateKey: 'test',
+      username: 'johnny'
+    });
+
+
+    let account = await peerplays.getImportableAccounts(testKeypair, testNetwork);
+    assert(account[0].name === testKeypair.username, 'account.username mismatch')
+    assert(account[0].authority === 'owner', 'account.authority mismatch')
+    assert(account[0].publicKey === testKeypair.publicKeys[0].key, 'publicKey mismatch')
+
+  })
+
 });

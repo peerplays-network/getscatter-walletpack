@@ -137,8 +137,8 @@ export default class KeyPairService {
     	if(publicToPrivate){
     		const p = await publicToPrivate(publicKey);
     		if(p !== false) return p;
-	    }
-
+        }
+        
         const keypair = this.getKeyPairFromPublicKey(publicKey, true);
         keypair.decrypt(await Seeder.getSeed());
         if(keypair) return keypair.privateKey;
@@ -182,6 +182,23 @@ export default class KeyPairService {
 		const keypair = this.getKeyPairFromPublicKey(publicKey);
 		if(!keypair) throw new Error('Keypair doesnt exist on keychain');
 		return keypair.external !== null;
-	}
+    }
+    
+    static generatePPYKeys(user, pass) {
+        const plugin = PluginRepository.plugin('ppy');
+        const keys = plugin.generateKeys(user, pass);
+        return keys;
+    }
+
+    static async publicToPrivatePPY(publicKey){
+    	if(publicToPrivate){
+    		const p = await publicToPrivate(publicKey);
+    		if(p !== false) return p;
+	    }
+
+        const keypair = this.getKeyPairFromPublicKey(publicKey, true);
+        if(keypair) return keypair.privateKey;
+        return null;
+    }
 
 }
