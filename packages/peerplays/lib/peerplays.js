@@ -105,8 +105,7 @@ export default class PPY extends Plugin {
 
     // You can assign other keypair instances to the returned keypair as it is an instance of Scatter KeyPair
     // ie: keypair.blockchains = ['ppy']
-    const keypair = PPYKeypairService.newKeypair(wifs, prefix);
-    return keypair;
+    return PPYKeypairService.newKeypair(wifs, prefix);
   }
 
   isEndorsedNetwork(network) {
