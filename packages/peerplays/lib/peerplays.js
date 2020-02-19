@@ -134,6 +134,14 @@ export default class PPY extends Plugin {
     return ChainValidation.is_account_name(name);
   }
 
+  /**
+   *
+   *
+   * @param {Object} keypair
+   * @param {Object} network
+   * @returns {Promise} Account Object
+   * @memberof PPY
+   */
   getImportableAccounts(keypair, network){
 		return new Promise((resolve, reject) => {
       if(!keypair.username) {
