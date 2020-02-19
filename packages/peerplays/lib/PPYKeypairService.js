@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import Keypair from "../../core/lib/models/Keypair";
+import Keypair from '@walletpack/core/models/Keypair';
 import _PPY from "./_PPY";
 
 class CryptoHelper {
@@ -38,13 +38,14 @@ class CryptoHelper {
   /**
    * Decrypt the private key WIFs from the provided `keypair`.
    *
-   * @param {Object} keypair
+   * @param {String} priv - Key that is encrypted
+   * @param {String} pub - The password that is needed to decrypt/encrypt.
    * @returns {*} json parsed decrypted values.
    * @memberof CryptoHelper
    */
-  decrypt(keypair) {
-    const secret = keypair.publicKeys[0].key;
-    const toDecrypt = keypair.privateKey;
+  decrypt(priv, pub) {
+    const secret = pub;
+    const toDecrypt = priv;
 
     const key = crypto
         .createHash("sha256")
@@ -86,15 +87,17 @@ export default class PPYKeypairService {
   static newKeypair(wifs, prefix) {
     const ch = new CryptoHelper();
     const keypair = Keypair.placeholder();
+    const blockchain = 'ppy';
     
     // Setup the decrypt/encrypt secret which will be the WIF Owner key.
     const secret = getPublicKeyString(wifs.owner, prefix);
 
     // Encrypt they WIF keys and treat the result as a "master" key that other keys can be derived from.
     keypair.privateKey = ch.encrypt(JSON.stringify(wifs), secret);
+    keypair.blockchains = [blockchain];
     
     // Here we are storing the secret which doubles as the decrypt seed later for the Scatter UI.
-    keypair.publicKeys = [{key: secret, blockchains: this.blockchains}]
+    keypair.publicKeys = [{key: secret, blockchain: blockchain}]
 
     return keypair;
   }
@@ -106,12 +109,13 @@ export default class PPYKeypairService {
    * const wifs = new CryptoHelper().decrypt(keypair);
    *
    * @static
-   * @param {Object} keypair - Scatter KeyPair instance object.
+   * @param {String} priv - Key that is encrypted
+   * @param {String} pub - The password that is needed to decrypt/encrypt.
    * @returns {{owner: String, active: String, memo: String}} wifs
    * @memberof PPYKeypairService
    */
-  static getWifs(keypair) {
+  static getWifs(priv, pub) {
     const ch = new CryptoHelper();
-    return ch.decrypt(keypair);
+    return ch.decrypt(priv, pub);
   }
 }
