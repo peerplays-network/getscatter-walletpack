@@ -445,6 +445,7 @@ export default class _PPY {
    * @param {Number} amount - The numerical amount of funds to send to the recipient.
    * @param {String} memo - The optional message to send along with the funds being transferred.
    * @param {String} asset - The Peerplays asset (User Issued Asset token) id associated with the transfer.
+   * @param {String} memoWif - Memo key in wallet import format (wif).
    * @param {String} proposeAccount - Optional, default null. The Peerplays account name to be proposed.
    * @param {Boolean} encryptMemo - Optional, default true. Whether or not to encrypt the memo.
    * @returns {Object} - A TransactionBuilder transaction instance with fees set on the transaction for a transfer operation.
@@ -456,6 +457,7 @@ export default class _PPY {
     amount,
     memo,
     asset,
+    memoWif,
     proposeAccount = null,
     encryptMemo = true,
     optional_nonce = null
@@ -464,7 +466,6 @@ export default class _PPY {
     if (!from || !to || !amount || !asset) {
       throw new Error('transfer: Missing inputs');
     }
-
     let memoToPublicKey;
 
     // get account data for `from`, `to`, & `proposeAccount`
@@ -490,14 +491,13 @@ export default class _PPY {
     //=================================================================
     // TODO: remove this once we have keys from Scatter to use instead
     //=================================================================
-    const wifMemo = '5KQwCkL561FYfED6LiA6Z3NCvKdAPWPX1AbYVSEPsD3yANTnFjx';
+    const wifMemo = memoWif;
     const memoPrivateKey = this.privateFromWif(wifMemo);
     const memoPublicKey = memoPrivateKey.toPublicKey().toPublicKeyString(PREFIX);
     //=================================================================
 
     if (memo && memoToPublicKey && memoPublicKey) {
       let nonce = optional_nonce == null ? TransactionHelper.unique_nonce_uint64() : optional_nonce;
-
       const message = Aes.encrypt_with_checksum(
         memoPrivateKey, // From Private Key
         memoToPublicKey, // To Public Key
