@@ -362,12 +362,15 @@ export default class PPY extends Plugin {
     const publicActiveKey = account.publicKey;
     amount = _PPY.convertToChainAmount(amount, token);
 
-    // Get the transaction
-    let transferTransaction = await _PPY.getTransferTransaction(from, to, amount, memo, '1.3.0');
+    // Get required keys
     let privateActiveKey = await KeyPairService.publicToPrivatePPY(account.publicKey);
     const wifs = PPYKeypairService.getWifs(privateActiveKey, publicActiveKey);
+    const memoWif = wifs.memo;
 
     privateActiveKey = _PPY.privateFromWif(wifs.active);
+
+    // Get the transaction
+    let transferTransaction = await _PPY.getTransferTransaction(from, to, amount, memo, '1.3.0', memoWif);
 
     // Sign the transaction
     if (!promptForSignature) {
