@@ -338,14 +338,6 @@ export default class PPY extends Plugin {
     transaction.add_signer(privateKey, publicKey);
 
     return transaction;
-
-    // if (!privateKey) privateKey = await KeyPairService.publicToPrivate(publicKey);
-    // if (!privateKey) return;
-
-    // if (typeof privateKey !== 'string') privateKey = this.bufferToHexPrivate(privateKey);
-
-    // if (arbitrary && isHash) return ecc.Signature.signHash(payload.data, privateKey).toString();
-    // return ecc.sign(Buffer.from(arbitrary ? payload.data : payload.buf, 'utf8'), privateKey);
   }
 
   /**
