@@ -49,6 +49,6 @@ export default class PPYKeypairService {
    * @memberof PPYKeypairService
    */
   static getWifs(encoded) {
-    return new Buffer(encoded, 'hex').toString();
+    return JSON.parse(new Buffer(encoded, 'hex').toString());
   }
 }
