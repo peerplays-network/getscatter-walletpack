@@ -27,15 +27,15 @@ export default class PPYKeypairService {
     const keypair = Keypair.placeholder();
     const blockchain = 'ppy';
     
-    // Setup the decrypt/encrypt secret which will be the WIF Owner key.
-    const secret = getPublicKeyString(wifs.owner, prefix);
+    // Get the private active key as public key
+    const privActive = getPublicKeyString(wifs.active, prefix);
 
     // Encode they WIF keys and treat the result as a "master" key that other keys can be derived from.
     keypair.privateKey = Buffer.from(JSON.stringify(wifs)).toString('hex')
     keypair.blockchains = [blockchain];
     
     // Here we are storing the secret which doubles as the decrypt seed later for the Scatter UI.
-    keypair.publicKeys = [{key: secret, blockchain: blockchain}]
+    keypair.publicKeys = [{key: privActive, blockchain: blockchain}]
 
     return keypair;
   }
@@ -44,7 +44,7 @@ export default class PPYKeypairService {
    * Decodes the KeyPair.privateKey returned from PPYKeyPairService.newKeypair(...) into the three authority Wallet Import Format (WIF) keys for a Peerplays account.
    *
    * @static
-   * @param {String} encoded - Encoded WIF keys object.
+   * @param {String} encoded - Encoded WIF keys object, the Keypair.privateKey.
    * @returns {{owner: String, active: String, memo: String}} wifs
    * @memberof PPYKeypairService
    */

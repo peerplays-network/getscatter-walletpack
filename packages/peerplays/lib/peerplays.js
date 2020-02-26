@@ -316,30 +316,58 @@ export default class PPY extends Plugin {
   }
 
   /**
-   * Add the keys needed to sign the transaction.
+   * Add the data (keys, memo) needed to sign the transaction.
    *
-   * @param {Object} transaction
-   * @param {Object} publicKey
+   * @param {Object} payload - contains the transaction
+   * @param {Object} pub - PublicKey.
    * @param {boolean} [arbitrary=false]
    * @param {boolean} [isHash=false]
-   * @param {Object} [privateKey=null]
+   * @param {Object} [priv=null] - Keypair.privateKey or equivalent.
    * @returns {Object} transaction
    * @memberof PPY
    */
-  async signer(payload, publicKey, arbitrary = false, isHash = false, privateKey = null) {
-    if (!publicKey && privateKey) {
-      publicKey = this.privateToPublic(payload.privateActiveKey);
+  async signer(payload, pub, arbitrary = false, isHash = false, priv = null) {
+    if (!payload || !pub) {
+      throw new Error('Signer: Missing inputs');
     }
 
-    // Sign the Peerplays transaction with private and public key
-    payload.transaction.add_signer(payload.privateActiveKey, publicKey);
+    let wifs, privActiveWif, privMemoWif, privActiveKey, pubActiveKey, tr;
 
-    return payload.transaction;
+    tr = payload.transaction;
+
+    if (typeof priv === 'string') {
+      wifs = PPYKeypairService.getWifs(priv);
+      privActiveWif = wifs.active;
+      privMemoWif = wifs.memo;
+
+      privActiveKey = _PPY.privateFromWif(privActiveWif);
+    }
+
+    // BUILD MEMO
+    const {recipient, message, op} = tr;
+    // Remove the temp properties from tr.
+    delete tr.recipient;
+    delete tr.message;
+    delete tr.op;
+
+    // ASSIGN DATA TO TRANSACTION
+    op.memo = await _PPY.buildMemo(message, privMemoWif, recipient);
+    let transferOp = tr.get_type_operation('transfer', op); // performs serialization on `op` to verify correct data input
+
+    // Add the transfer operation to the transaction
+    tr.add_operation(transferOp);
+
+    // SET FEES
+    await _PPY.setRequiredFees(undefined, tr);
+
+    // SIGN
+    tr.add_signer(privActiveKey, pubActiveKey);
+
+    return tr;
   }
 
   /**
-   * Perform transfer...
-   * TODO: ensure returns expected, what is transaction_id?
+   * Perform transfer
    *
    * @param {{account: Object, to: String, amount: Number, memo: String, token: String, promptForSignature: Boolean}}
    * @param {Object} testingKeys - If called via unit test, provide this.
@@ -347,25 +375,13 @@ export default class PPY extends Plugin {
    * @memberof PPY
    */
   async transfer({ account, to, amount, memo, token, promptForSignature = false }, testingKeys) {
-    const from = account.name;
-    const publicActiveKey = account.publicKey;
-    let keyNumAry;
-    amount = _PPY.convertToChainAmount(amount, token);
-
-    // Get required keys
-    let privateActiveKey = await KeyPairService.publicToPrivate(account.publicKey);
-    if (typeof privateActiveKey !== 'string') {
-      keyNumAry = privateActiveKey
-        .toString()
-        .split(',')
-        .map(Number);
-      privateActiveKey = String.fromCharCode.apply(null, keyNumAry);
+    if (!account || !to || !amount || !token) {
+      throw new Error('transfer: Missing inputs');
     }
 
-    const wifs = PPYKeypairService.getWifs(privateActiveKey, publicActiveKey);
-    const memoWif = wifs.memo;
-
-    privateActiveKey = _PPY.privateFromWif(wifs.active);
+    const from = account.name;
+    const publicOwnerKey = account.publicKey;
+    amount = _PPY.convertToChainAmount(amount, token);
 
     // Get the transaction
     let transferTransaction = await _PPY.getTransferTransaction(
@@ -373,8 +389,7 @@ export default class PPY extends Plugin {
       to,
       amount,
       memo,
-      '1.3.0',
-      memoWif
+      '1.3.0'
     );
 
     // Build payload
@@ -387,14 +402,6 @@ export default class PPY extends Plugin {
       transferTransaction = await this.signerWithPopup(transferTransaction, account, finished);
     } else {
       transferTransaction = await SigningService.sign(account.network(), payload, publicOwnerKey);
-      //   transferTransaction = await this.signer(
-      //     transferTransaction,
-      //     publicOwnerKey,
-      //     false,
-      //     false,
-      //     privateActiveKey
-      //   );
-      // }
 
       // For testing
       if (testingKeys) {

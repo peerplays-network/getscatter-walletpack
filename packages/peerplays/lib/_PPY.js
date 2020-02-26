@@ -436,47 +436,29 @@ export default class _PPY {
   }
 
   /**
-   * Construct an unsigned transaction for a transfer operation with correct fees.
+   * Build the required memo object for a Peeprlays transfer operation.
    *
    * @static
-   * @param {Object} args - Required params for the construction of the transaction and its operations.
-   * @param {String} from - The sending Peerplays account name.
-   * @param {String} to - The recipient Peerplays account name.
-   * @param {Number} amount - The numerical amount of funds to send to the recipient.
-   * @param {String} memo - The optional message to send along with the funds being transferred.
-   * @param {String} asset - The Peerplays asset (User Issued Asset token) id associated with the transfer.
-   * @param {String} memoWif - Memo key in wallet import format (wif).
-   * @param {String} proposeAccount - Optional, default null. The Peerplays account name to be proposed.
-   * @param {Boolean} encryptMemo - Optional, default true. Whether or not to encrypt the memo.
-   * @returns {Object} - A TransactionBuilder transaction instance with fees set on the transaction for a transfer operation.
+   * @param {string} memo
+   * @param {string} memoWif
+   * @param {string} recipient
+   * @param {boolean} [encryptMemo=true]
+   * @param {*} [optional_nonce=null]
+   * @returns
    * @memberof _PPY
    */
-  static async getTransferTransaction(
-    from,
-    to,
-    amount,
-    memo,
-    asset,
-    memoWif,
-    proposeAccount = null,
-    encryptMemo = true,
-    optional_nonce = null
-  ) {
-    let feeAssetId = asset;
-    if (!from || !to || !amount || !asset) {
-      throw new Error('transfer: Missing inputs');
+  static async buildMemo(memo, memoWif, recipient, encryptMemo = true, optional_nonce = null) {
+    if (!memo || !memoWif) {
+      throw new Error('buildMemo: Missing inputs');
     }
+
     let memoToPublicKey;
 
-    // get account data for `from`, `to`, & `proposeAccount`
-    const [chainFrom, chainTo] = [await this.getFullAccount(from), await this.getFullAccount(to)];
-    const chainProposeAccount = proposeAccount && (await this.getFullAccount(proposeAccount));
-
-    // get asset data
-    let chainAsset = await this.getAsset(asset);
+    // get account data for `from`, and `to`
+    const chainTo = await this.getFullAccount(recipient);
 
     // If we have a non-empty string memo and are configured to encrypt...
-    if (memo && encryptMemo) {
+    if (encryptMemo) {
       memoToPublicKey = chainTo.options.memo_key;
 
       // Check for a null memo key, if the memo key is null use the receivers active key
@@ -485,33 +467,48 @@ export default class _PPY {
       }
     }
 
-    let proposeAcountId = proposeAccount ? chainProposeAccount.id : null;
-    let memoObject;
-
-    //=================================================================
-    // TODO: remove this once we have keys from Scatter to use instead
-    //=================================================================
-    const wifMemo = memoWif;
-    const memoPrivateKey = this.privateFromWif(wifMemo);
+    const memoPrivateKey = this.privateFromWif(memoWif);
     const memoPublicKey = memoPrivateKey.toPublicKey().toPublicKeyString(PREFIX);
-    //=================================================================
 
-    if (memo && memoToPublicKey && memoPublicKey) {
-      let nonce = optional_nonce == null ? TransactionHelper.unique_nonce_uint64() : optional_nonce;
-      const message = Aes.encrypt_with_checksum(
+    let nonce = optional_nonce == null ? TransactionHelper.unique_nonce_uint64() : optional_nonce;
+
+    // memoObject
+    return {
+      from: memoPublicKey, // From Public Key
+      to: memoToPublicKey, // To Public Key
+      nonce,
+      message: Aes.encrypt_with_checksum(
         memoPrivateKey, // From Private Key
         memoToPublicKey, // To Public Key
         nonce,
         memo
-      );
+      ),
+    };
+  }
 
-      memoObject = {
-        from: memoPublicKey, // From Public Key
-        to: memoToPublicKey, // To Public Key
-        nonce,
-        message,
-      };
+  /**
+   * Construct an unsigned transaction for a transfer operation with correct fees.
+   *
+   * @static
+   * @param {String} from - The sending Peerplays account name.
+   * @param {String} to - The recipient Peerplays account name.
+   * @param {Number} amount - The numerical amount of funds to send to the recipient.
+   * @param {String} memo - The optional message to send along with the funds being transferred.
+   * @param {String} asset - The Peerplays asset (User Issued Asset token) id associated with the transfer.
+   * @returns {TransactionBuilder} - A TransactionBuilder transaction instance with fees set on the transaction for a transfer operation.
+   * @memberof _PPY
+   */
+  static async getTransferTransaction(from, to, amount, memo, asset) {
+    let feeAssetId = asset;
+    if (!from || !to || !amount || !asset) {
+      throw new Error('transfer: Missing inputs');
     }
+
+    // Get account data
+    const [chainFrom, chainTo] = [await this.getFullAccount(from), await this.getFullAccount(to)];
+
+    // get asset data
+    let chainAsset = await this.getAsset(asset);
 
     // Allow user to choose asset with which to pay fees
     let feeAsset = chainAsset;
@@ -526,7 +523,7 @@ export default class _PPY {
 
     let tr = new TransactionBuilder();
 
-    let transferOp = tr.get_type_operation('transfer', {
+    let transferOp = {
       fee: {
         amount: 0,
         asset_id: feeAssetId,
@@ -537,22 +534,23 @@ export default class _PPY {
         amount,
         asset_id: chainAsset.id,
       },
-      memo: memoObject,
-    });
+      memo: {
+        from: PREFIX,
+        to: '',
+        nonce: 0,
+        message: ''
+      },
+    };
 
-    if (proposeAccount) {
-      let proposalCreateOp = tr.get_type_operation('proposal_create', {
-        proposed_ops: [{ op: transferOp }],
-        fee_paying_account: proposeAcountId,
-      });
-      tr.add_operation(proposalCreateOp);
-      tr.operations[0][1].expiration_time = parseInt(Date.now() / 1000 + 5);
-    } else {
-      tr.add_operation(transferOp);
-    }
+    tr.op = transferOp;
+    tr.recipient = to; // assign temp recipient prop for use later when building the memo.
+    tr.message = memo; // assign temp message prop for use later when building the memo.
+
+    // Return the unfinished transaction. Fee setting, finalizing, serialization: occure elsewhere within peerplays.js
+    return tr;
 
     // Set the transaction fees for the new transaction
-    return await this.setRequiredFees(undefined, tr);
+    // return await this.setRequiredFees(undefined, tr);
   }
 
   /**
