@@ -189,17 +189,4 @@ export default class KeyPairService {
         const keys = plugin.generateKeys(user, pass);
         return keys;
     }
-
-    static async publicToPrivatePPY(publicKey){
-    	if(publicToPrivate){
-    		const p = await publicToPrivate(publicKey);
-    		if(p !== false) return p;
-	    }
-
-        const keypair = this.getKeyPairFromPublicKey(publicKey, true);
-        keypair.decrypt(await Seeder.getSeed());
-        if(keypair) return keypair.privateKey;
-        return null;
-    }
-
 }
