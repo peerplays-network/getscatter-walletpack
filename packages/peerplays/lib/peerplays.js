@@ -386,10 +386,10 @@ export default class PPY extends Plugin {
     if (promptForSignature) {
       transferTransaction = await this.signerWithPopup(transferTransaction, account, finished);
     } else {
-      transferTransaction = await SigningService.sign(account.network(), payload, publicActiveKey);
+      transferTransaction = await SigningService.sign(account.network(), payload, publicOwnerKey);
       //   transferTransaction = await this.signer(
       //     transferTransaction,
-      //     publicActiveKey,
+      //     publicOwnerKey,
       //     false,
       //     false,
       //     privateActiveKey
