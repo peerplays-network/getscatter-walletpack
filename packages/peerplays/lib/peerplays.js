@@ -68,10 +68,7 @@ export default class PPY extends Plugin {
   checkNetwork(network) {
     return Promise.race([
       new Promise(resolve => setTimeout(() => resolve(null), 2000)),
-      fetch(`${network.fullhost()}/v1/chain/get_info`)
-        .then(() => true)
-        .catch(() => false),
-    ]);
+      _PPY.getChainId().then(() => true).catch(() => false)])
   }
 
   getEndorsedNetwork() {
@@ -184,7 +181,7 @@ export default class PPY extends Plugin {
   }
 
   validPrivateKey(privateKey) {
-    return privateKey.length >= 50 && ecc.isValidPrivate(privateKey);
+    return true;
   }
 
   validPublicKey(publicKey, prefix = null) {
@@ -282,7 +279,7 @@ export default class PPY extends Plugin {
 
   async signerWithPopup(payload, account, rejector) {
     return new Promise(async resolve => {
-      payload.messages = await this.requestParser(payload);
+      // payload.messages = await this.requestParser(payload);
       payload.identityKey = StoreService.get().state.scatter.keychain.identities[0].publicKey;
       payload.participants = [account];
       payload.network = account.network();
@@ -290,7 +287,7 @@ export default class PPY extends Plugin {
       const request = {
         payload,
         origin: payload.origin,
-        blockchain: Blockchains.TRX,
+        blockchain: 'ppy',
         requiredFields: {},
         type: Actions.SIGN,
         id: 1,
@@ -329,15 +326,15 @@ export default class PPY extends Plugin {
    * @returns {Object} transaction
    * @memberof PPY
    */
-  async signer(transaction, publicKey, arbitrary = false, isHash = false, privateKey = null) {
+  async signer(payload, publicKey, arbitrary = false, isHash = false, privateKey = null) {
     if (!publicKey && privateKey) {
-      publicKey = this.privateToPublic(privateKey);
+      publicKey = this.privateToPublic(payload.privateActiveKey);
     }
 
     // Sign the Peerplays transaction with private and public key
-    transaction.add_signer(privateKey, publicKey);
+    payload.transaction.add_signer(payload.privateActiveKey, publicKey);
 
-    return transaction;
+    return payload.transaction;
   }
 
   /**
@@ -349,33 +346,45 @@ export default class PPY extends Plugin {
    * @returns {Promise} resolve/reject - Resolve with transaction id if their is one. Reject with error if there is one.
    * @memberof PPY
    */
-  async transfer({ account, to, amount, memo, token, promptForSignature = true }, testingKeys) {
+  async transfer({ account, to, amount, memo, token, promptForSignature = false }, testingKeys) {
     const from = account.name;
     const publicActiveKey = account.publicKey;
+    let keyNumAry;
     amount = _PPY.convertToChainAmount(amount, token);
 
     // Get required keys
     let privateActiveKey = await KeyPairService.publicToPrivatePPY(account.publicKey);
+    if(typeof privateActiveKey !== 'string') {
+      keyNumAry = privateActiveKey.toString().split(',').map(Number);
+      privateActiveKey = String.fromCharCode.apply(null, keyNumAry);
+    }
+    
     const wifs = PPYKeypairService.getWifs(privateActiveKey, publicActiveKey);
     const memoWif = wifs.memo;
-
+    
     privateActiveKey = _PPY.privateFromWif(wifs.active);
 
     // Get the transaction
     let transferTransaction = await _PPY.getTransferTransaction(from, to, amount, memo, '1.3.0', memoWif);
 
+    // Build payload
+    let payload = {};
+    payload.transaction = transferTransaction;
+    payload.privateActiveKey = privateActiveKey
+
     // Sign the transaction
-    if (!promptForSignature) {
-      // transferTransaction = this.signerWithPopup(transferTransaction, account, )
+    if (promptForSignature) {
+      transferTransaction = await this.signerWithPopup(transferTransaction, account, finished)
     } else {
-      transferTransaction = await this.signer(
-        transferTransaction,
-        publicActiveKey,
-        false,
-        false,
-        privateActiveKey
-      );
-    }
+      transferTransaction = await SigningService.sign(account.network(), payload, publicActiveKey);
+    //   transferTransaction = await this.signer(
+    //     transferTransaction,
+    //     publicActiveKey,
+    //     false,
+    //     false,
+    //     privateActiveKey
+    //   );
+    // }
 
     // For testing
     if (testingKeys) {
@@ -406,4 +415,5 @@ export default class PPY extends Plugin {
       });
     });
   }
+}
 }
