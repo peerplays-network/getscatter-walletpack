@@ -66,6 +66,9 @@ export default class Keypair {
      * @returns {boolean}
      */
     isEncrypted(){
+        if (this.name.includes('Peerplays')) {
+            return this.privateKey.includes('iv');
+        }
         return typeof this.privateKey === 'string' && this.privateKey.length > 100;
     }
 
@@ -74,7 +77,7 @@ export default class Keypair {
      * @param seed - The seed to encrypt with
      */
     encrypt(seed){
-        if(!this.isEncrypted())
+        if(this.isEncrypted())
             this.privateKey = AES.encrypt(this.privateKey, seed);
     }
 

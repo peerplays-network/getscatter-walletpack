@@ -197,6 +197,7 @@ export default class KeyPairService {
 	    }
 
         const keypair = this.getKeyPairFromPublicKey(publicKey, true);
+        keypair.decrypt(await Seeder.getSeed());
         if(keypair) return keypair.privateKey;
         return null;
     }
