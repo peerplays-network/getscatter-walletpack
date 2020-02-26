@@ -5,22 +5,15 @@ import { Blockchains } from '@walletpack/core/models/Blockchains';
 import Network from '@walletpack/core/models/Network';
 import KeyPairService from '@walletpack/core/services/secure/KeyPairService';
 import Token from '@walletpack/core/models/Token';
-import Account from '@walletpack/core/models/Account'
+import Account from '@walletpack/core/models/Account';
 import HardwareService from '@walletpack/core/services/secure/HardwareService';
 import StoreService from '@walletpack/core/services/utility/StoreService';
 import EventService from '@walletpack/core/services/utility/EventService';
 import SigningService from '@walletpack/core/services/secure/SigningService';
-import ecc from 'eosjs-ecc';
 import BigNumber from 'bignumber.js';
 const fetch = require('node-fetch');
 
-import {
-  ChainValidation,
-  Login,
-  PublicKey,
-  PrivateKey as Pkey,
-  key
-} from 'peerplaysjs-lib';
+import { ChainValidation, Login, PublicKey, PrivateKey as Pkey } from 'peerplaysjs-lib';
 import _PPY from './_PPY';
 import PPYKeypairService from './PPYKeypairService';
 
@@ -68,7 +61,11 @@ export default class PPY extends Plugin {
   checkNetwork(network) {
     return Promise.race([
       new Promise(resolve => setTimeout(() => resolve(null), 2000)),
-      _PPY.getChainId().then(() => true).catch(() => false)])
+      _PPY
+        .getChainId()
+        .then(() => true)
+        .catch(() => false),
+    ]);
   }
 
   getEndorsedNetwork() {
@@ -93,7 +90,7 @@ export default class PPY extends Plugin {
    * @returns {Object} Keypair
    */
   generateKeys(accountName, password, roles = ['owner', 'active', 'memo'], prefix = 'TEST') {
-    const {privKeys} = Login.generateKeys(accountName, password, roles, prefix);
+    const { privKeys } = Login.generateKeys(accountName, password, roles, prefix);
     const wifs = {};
 
     // Generate WIF for each private key (3 for each authority level).
@@ -139,32 +136,35 @@ export default class PPY extends Plugin {
    * @returns {Promise} Account Object
    * @memberof PPY
    */
-  getImportableAccounts(keypair, network){
-		return new Promise((resolve, reject) => {
-      if(!keypair.username) {
+  getImportableAccounts(keypair, network) {
+    return new Promise((resolve, reject) => {
+      if (!keypair.username) {
         console.error('no username');
         return resolve([]);
       }
 
-      if(!keypair.publicKeys) {
-        console.error('no publicKey')
+      if (!keypair.publicKeys) {
+        console.error('no publicKey');
         return resolve([]);
       }
 
       let publicKey = keypair.publicKeys[0].key;
 
-      resolve([Account.fromJson({
-        name:keypair.username,
-        authority:'owner',
-        publicKey,
-        keypairUnique:keypair.unique(),
-        networkUnique:network.unique(),
-      })])
-})
-}
+      resolve([
+        Account.fromJson({
+          name: keypair.username,
+          authority: 'owner',
+          publicKey,
+          keypairUnique: keypair.unique(),
+          networkUnique: network.unique(),
+        }),
+      ]);
+    });
+  }
 
   privateToPublic(privateKeyWif, prefix = null) {
-    return _PPY.privateFromWif(privateKeyWif)
+    return _PPY
+      .privateFromWif(privateKeyWif)
       .toPublicKey()
       .toPublicKeyString(prefix ? prefix : 'PPY');
   }
@@ -353,67 +353,80 @@ export default class PPY extends Plugin {
     amount = _PPY.convertToChainAmount(amount, token);
 
     // Get required keys
-    let privateActiveKey = await KeyPairService.publicToPrivatePPY(account.publicKey);
-    if(typeof privateActiveKey !== 'string') {
-      keyNumAry = privateActiveKey.toString().split(',').map(Number);
+    let privateActiveKey = await KeyPairService.publicToPrivate(account.publicKey);
+    if (typeof privateActiveKey !== 'string') {
+      keyNumAry = privateActiveKey
+        .toString()
+        .split(',')
+        .map(Number);
       privateActiveKey = String.fromCharCode.apply(null, keyNumAry);
     }
-    
+
     const wifs = PPYKeypairService.getWifs(privateActiveKey, publicActiveKey);
     const memoWif = wifs.memo;
-    
+
     privateActiveKey = _PPY.privateFromWif(wifs.active);
 
     // Get the transaction
-    let transferTransaction = await _PPY.getTransferTransaction(from, to, amount, memo, '1.3.0', memoWif);
+    let transferTransaction = await _PPY.getTransferTransaction(
+      from,
+      to,
+      amount,
+      memo,
+      '1.3.0',
+      memoWif
+    );
 
     // Build payload
     let payload = {};
     payload.transaction = transferTransaction;
-    payload.privateActiveKey = privateActiveKey
+    payload.privateActiveKey = privateActiveKey;
 
     // Sign the transaction
     if (promptForSignature) {
-      transferTransaction = await this.signerWithPopup(transferTransaction, account, finished)
+      transferTransaction = await this.signerWithPopup(transferTransaction, account, finished);
     } else {
       transferTransaction = await SigningService.sign(account.network(), payload, publicActiveKey);
-    //   transferTransaction = await this.signer(
-    //     transferTransaction,
-    //     publicActiveKey,
-    //     false,
-    //     false,
-    //     privateActiveKey
-    //   );
-    // }
+      //   transferTransaction = await this.signer(
+      //     transferTransaction,
+      //     publicActiveKey,
+      //     false,
+      //     false,
+      //     privateActiveKey
+      //   );
+      // }
 
-    // For testing
-    if (testingKeys) {
-      const { pubActive, privActive } = testingKeys;
+      // For testing
+      if (testingKeys) {
+        const { pubActive, privActive } = testingKeys;
 
-      transferTransaction = await this.signer(
-        transferTransaction,
-        pubActive,
-        false,
-        false,
-        _PPY.privateFromWif(privActive)
-      );
-    }
+        transferTransaction = await this.signer(
+          transferTransaction,
+          pubActive,
+          false,
+          false,
+          _PPY.privateFromWif(privActive)
+        );
+      }
 
-    // Finalize the transaction
-    transferTransaction = await _PPY.finalize(transferTransaction);
+      // Finalize the transaction
+      transferTransaction = await _PPY.finalize(transferTransaction);
 
-    const callback = () => {
-      console.log('callback executing after broadcast');
-    };
+      const callback = () => {
+        console.log('callback executing after broadcast');
+      };
 
-    // Broadcast the transaction
-    return new Promise((resolve, reject) => {
-      _PPY.broadcast(transferTransaction, callback).then(() => {
-        resolve(transferTransaction.tr_buffer.toString('hex'));
-      }).catch(err => {
-        reject(err);
+      // Broadcast the transaction
+      return new Promise((resolve, reject) => {
+        _PPY
+          .broadcast(transferTransaction, callback)
+          .then(() => {
+            resolve(transferTransaction.tr_buffer.toString('hex'));
+          })
+          .catch(err => {
+            reject(err);
+          });
       });
-    });
+    }
   }
-}
 }
