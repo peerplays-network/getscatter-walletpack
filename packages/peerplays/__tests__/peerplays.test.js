@@ -68,7 +68,9 @@ const dummyAccount = {
 // Used for tests requiring public and private keys
 const testingKeys = {
   pubActive: TESTING_ACCOUNT.pubKeys.active,
-  privActive: TESTING_ACCOUNT.wifs.active
+  privActive: TESTING_ACCOUNT.wifs.active,
+  pubMemo: TESTING_ACCOUNT.pubKeys.memo,
+  privMemo: TESTING_ACCOUNT.wifs.memo
 }
 
 describe('peerplays', () => {
@@ -133,9 +135,11 @@ describe('peerplays', () => {
     let {amount} = transactionTest;
     const memo = 'test memo';
     amount = _PPY.convertToChainAmount(amount, token);
+    const memoWif = testingKeys.privMemo;
 
     // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
-    let tr = await _PPY.getTransferTransaction(from, to, amount, memo, asset);
+    let tr = await _PPY.getTransferTransaction(from, to, amount, memo, asset, memoWif);
+
     assert(tr.operations[0][1].fee.amount > 0);
   });
 
@@ -145,8 +149,15 @@ describe('peerplays', () => {
     const memo = 'test memo';
     amount = _PPY.convertToChainAmount(amount, token);
 
+    // define new keypair
+    const kp = PPYKeypairService.newKeypair(TESTING_ACCOUNT.wifs, 'TEST');
+
     let tr = await _PPY.getTransferTransaction(from, to, amount, memo, asset);
-    tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, _PPY.privateFromWif(TESTING_ACCOUNT.wifs.active));
+
+    // Build payload
+    let payload = {};
+    payload.transaction = tr;
+    tr = await peerplays.signer(payload, TESTING_ACCOUNT.pubKeys.active, false, false, kp.privateKey); // scatter desktop will provide the privActive
 
     assert(tr.signer_private_keys.length > 0);
   });
@@ -157,8 +168,15 @@ describe('peerplays', () => {
     const memo = 'test memo';
     amount = _PPY.convertToChainAmount(amount, token);
 
+    // define new keypair
+    const kp = PPYKeypairService.newKeypair(TESTING_ACCOUNT.wifs, 'TEST');
+
     let tr = await _PPY.getTransferTransaction(from, to, amount, memo, asset);
-    tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, _PPY.privateFromWif(TESTING_ACCOUNT.wifs.active));
+
+    // Build payload
+    let payload = {};
+    payload.transaction = tr;
+    tr = await peerplays.signer(payload, TESTING_ACCOUNT.pubKeys.active, false, false, kp.privateKey); // scatter desktop will provide the privActive
     await _PPY.finalize(tr);
 
     // no errors, test passes
@@ -187,7 +205,7 @@ describe('peerplays', () => {
     });
   });
 
-  it('should generate a Keypair instance successfully with a decryptable "master" private key', async () => {
+  it('should generate a Keypair instance successfully with a decodable "master" private key', async () => {
     const {privKeys} = Login.generateKeys(TESTING_ACCOUNT.username, TESTING_ACCOUNT.password, ['owner', 'active', 'memo'], TESTING_ACCOUNT.prefix);
     const wifs = {};
 
@@ -199,10 +217,10 @@ describe('peerplays', () => {
     // You can assign other keypair instances to the returned keypair as it is an instance of Scatter KeyPair
     // ie: keypair.blockchains = ['ppy']
     const keypair = PPYKeypairService.newKeypair(wifs, TESTING_ACCOUNT.prefix);
-    const decryptedWifs = PPYKeypairService.getWifs(keypair);
+    const decryptedWifs = PPYKeypairService.getWifs(keypair.privateKey);
 
     assert(decryptedWifs.owner === TESTING_ACCOUNT.wifs.owner, 'owner key wif decrypt mismatch')
     assert(decryptedWifs.active === TESTING_ACCOUNT.wifs.active, 'active key wif decrypt mismatch')
     assert(decryptedWifs.memo === TESTING_ACCOUNT.wifs.memo, 'memo key wif decrypt mismatch')
-  })
+  });
 });
