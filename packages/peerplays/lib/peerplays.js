@@ -395,7 +395,6 @@ export default class PPY extends Plugin {
     // Build payload
     let payload = {};
     payload.transaction = transferTransaction;
-    payload.privateActiveKey = privateActiveKey;
 
     // Sign the transaction
     if (promptForSignature) {
