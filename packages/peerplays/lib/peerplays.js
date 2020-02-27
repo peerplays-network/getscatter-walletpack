@@ -370,7 +370,7 @@ export default class PPY extends Plugin {
    * Perform transfer
    *
    * @param {{account: Object, to: String, amount: Number, memo: String, token: String, promptForSignature: Boolean}}
-   * @param {Object} testingKeys - If called via unit test, provide this.
+   * @param {{pubActive: string, pubMemo: string, privActive: string, privMemo: string}} testingKeys - If called via unit test, provide this.
    * @returns {Promise} resolve/reject - Resolve with transaction id if their is one. Reject with error if there is one.
    * @memberof PPY
    */
