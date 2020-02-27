@@ -10,6 +10,7 @@ import HardwareService from '@walletpack/core/services/secure/HardwareService';
 import StoreService from '@walletpack/core/services/utility/StoreService';
 import EventService from '@walletpack/core/services/utility/EventService';
 import SigningService from '@walletpack/core/services/secure/SigningService';
+// import SigningService from '../../core/lib/services/secure/SigningService';
 import BigNumber from 'bignumber.js';
 const fetch = require('node-fetch');
 
@@ -331,7 +332,7 @@ export default class PPY extends Plugin {
       throw new Error('Signer: Missing inputs');
     }
 
-    let wifs, privActiveWif, privMemoWif, privActiveKey, pubActiveKey, tr;
+    let wifs, privActiveWif, privMemoWif, privActiveKey, tr;
 
     tr = payload.transaction;
 
@@ -350,8 +351,10 @@ export default class PPY extends Plugin {
     delete tr.message;
     delete tr.op;
 
+    let memoObject;
+
     // ASSIGN DATA TO TRANSACTION
-    op.memo = await _PPY.buildMemo(message, privMemoWif, recipient);
+    op.memo = message ? await _PPY.buildMemo(message, privMemoWif, recipient) : memoObject;
     let transferOp = tr.get_type_operation('transfer', op); // performs serialization on `op` to verify correct data input
 
     // Add the transfer operation to the transaction
@@ -361,7 +364,7 @@ export default class PPY extends Plugin {
     await _PPY.setRequiredFees(undefined, tr);
 
     // SIGN
-    tr.add_signer(privActiveKey, pubActiveKey);
+    tr.add_signer(privActiveKey, pub);
 
     return tr;
   }
@@ -380,7 +383,7 @@ export default class PPY extends Plugin {
     }
 
     const from = account.name;
-    const publicOwnerKey = account.publicKey;
+    const publicActiveKey = account.publicKey;
     amount = _PPY.convertToChainAmount(amount, token);
 
     // Get the transaction
@@ -400,29 +403,30 @@ export default class PPY extends Plugin {
     if (promptForSignature) {
       transferTransaction = await this.signerWithPopup(transferTransaction, account, finished);
     } else {
-      transferTransaction = await SigningService.sign(account.network(), payload, publicOwnerKey);
-
       // For testing
       if (testingKeys) {
         const { pubActive, privActive } = testingKeys;
 
         transferTransaction = await this.signer(
-          transferTransaction,
+          payload,
           pubActive,
           false,
           false,
-          _PPY.privateFromWif(privActive)
+          privActive
         );
       }
 
-      // Finalize the transaction
+      // SIGN
+      transferTransaction = await SigningService.sign(account.network(), payload, publicActiveKey);
+
+      // FINALIZE
       transferTransaction = await _PPY.finalize(transferTransaction);
 
       const callback = () => {
-        console.log('callback executing after broadcast');
+        console.info('callback executing after broadcast');
       };
 
-      // Broadcast the transaction
+      // BROADCAST
       return new Promise((resolve, reject) => {
         _PPY
           .broadcast(transferTransaction, callback)

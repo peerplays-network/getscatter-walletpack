@@ -470,24 +470,30 @@ export default class _PPY {
     const memoPrivateKey = this.privateFromWif(memoWif);
     const memoPublicKey = memoPrivateKey.toPublicKey().toPublicKeyString(PREFIX);
 
-    let nonce = optional_nonce == null ? TransactionHelper.unique_nonce_uint64() : optional_nonce;
+    let memoObject;
 
-    // memoObject
-    return {
-      from: memoPublicKey, // From Public Key
-      to: memoToPublicKey, // To Public Key
-      nonce,
-      message: Aes.encrypt_with_checksum(
-        memoPrivateKey, // From Private Key
-        memoToPublicKey, // To Public Key
+    if (memoToPublicKey && memoPublicKey) {
+      let nonce = optional_nonce == null ? TransactionHelper.unique_nonce_uint64() : optional_nonce;
+
+      memoObject = {
+        from: memoPublicKey, // From Public Key
+        to: memoToPublicKey, // To Public Key
         nonce,
-        memo
-      ),
-    };
+        message: Aes.encrypt_with_checksum(
+          memoPrivateKey, // From Private Key
+          memoToPublicKey, // To Public Key
+          nonce,
+          memo
+        ),
+      };
+    }
+
+    return memoObject;
   }
 
   /**
-   * Construct an unsigned transaction for a transfer operation with correct fees.
+   * Construct a pseudo unsigned transaction for a transfer operation without fees.
+   * The return value of this function is not a complete transaction.
    *
    * @static
    * @param {String} from - The sending Peerplays account name.
@@ -546,11 +552,8 @@ export default class _PPY {
     tr.recipient = to; // assign temp recipient prop for use later when building the memo.
     tr.message = memo; // assign temp message prop for use later when building the memo.
 
-    // Return the unfinished transaction. Fee setting, finalizing, serialization: occure elsewhere within peerplays.js
+    // Return the unfinished transaction. Fee setting, finalizing, serialization: occur elsewhere within peerplays.js
     return tr;
-
-    // Set the transaction fees for the new transaction
-    // return await this.setRequiredFees(undefined, tr);
   }
 
   /**

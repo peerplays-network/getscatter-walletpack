@@ -49,6 +49,11 @@ export default class PPYKeypairService {
    * @memberof PPYKeypairService
    */
   static getWifs(encoded) {
-    return JSON.parse(Buffer.from(encoded, 'hex').toString());
+    const wifs = JSON.parse(Buffer.from(encoded, 'hex').toString())
+
+    if (!wifs.owner || !wifs.active || !wifs.memo) {
+      throw new Error('getWifs: Invalid encoded data provided')
+    }
+    return wifs;
   }
 }
