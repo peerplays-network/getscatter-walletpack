@@ -127,6 +127,11 @@ const testingKeys = {
 };
 
 describe('peerplays', () => {
+  it.only('wif memo => public memo key', async () => {
+    const wif = '5KQwCkL561FYfED6LiA6Z3NCvKdAPWPX1AbYVSEPsD3yANTnFjx';
+    console.log(_PPY.privateFromWif(wif).toPublicKey().toPublicKeyString('TEST'));
+  });
+
   it("should convert a private key WIF to it's public key (privateToPublic)", async () => {
     const [wif, prefix, publicKey] = [
       TESTING_ACCOUNT.wifs.active,
@@ -200,7 +205,7 @@ describe('peerplays', () => {
     assert(tr.signer_private_keys.length > 0);
   });
 
-  it('should be able to transfer a balance WITHOUT a memo', async () => {
+  it('should be able to transfer a balance WITHOUT & WITH a memo', async () => {
     const token = peerplays.defaultToken();
     token.amount = 1;
 
@@ -215,32 +220,16 @@ describe('peerplays', () => {
     account.network = () => network;
     account.keypair = () => KEYPAIR;
 
-    const transferred = await peerplays.transfer({
+    const transferredNoMemo = await peerplays.transfer({
       account,
       to: transactionTest.to,
       amount: 1,
       token
     });
 
-    assert(!transferred.message)
-  });
+    assert(!transferredNoMemo.message);
 
-  it('should be able to transfer a balance WITH a memo', async () => {
-    const token = peerplays.defaultToken();
-    token.amount = 1;
-
-    const account = Account.fromJson({
-      name: TESTING_ACCOUNT.username,
-      authority: 'active',
-      publicKey: TESTING_ACCOUNT.pubKeys.active,
-    });
-
-    // OVERRIDING NETWORK GETTER
-    account.blockchain = () => Blockchains.PPY;
-    account.network = () => network;
-    account.keypair = () => KEYPAIR;
-
-    const transferred = await peerplays.transfer({
+    const transferredWithMemo = await peerplays.transfer({
       account,
       to: transactionTest.to,
       amount: 1,
@@ -248,7 +237,7 @@ describe('peerplays', () => {
       token
     });
 
-    assert(!transferred.message)
+    assert(!transferredWithMemo.message);
   });
 
   it('should generate a Keypair instance successfully with a decodable "master" private key', async () => {
