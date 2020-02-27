@@ -193,8 +193,8 @@ export default class PPY extends Plugin {
   }
 
   bufferToHexPrivate(buffer) {
-    const bufKey = Pkey.fromBuffer(Buffer.from(buffer));
-    return bufKey.toWif();
+    let keyNumAry = buffer.data;
+    return String.fromCharCode.apply(null, keyNumAry);
   }
 
   hexPrivateToBuffer(privateKey) {
