@@ -163,6 +163,14 @@ export default class PPY extends Plugin {
     });
   }
 
+  /**
+   * Take an input Wallet Import Format (WIF) key (application code is calling WIFs private keys) and convert that to a PrivateKey.
+   *
+   * @param {string} privateKeyWif - WIF format key.
+   * @param {string} [prefix=null] - Chain prfix.
+   * @returns
+   * @memberof PPY
+   */
   privateToPublic(privateKeyWif, prefix = null) {
     return _PPY
       .privateFromWif(privateKeyWif)
