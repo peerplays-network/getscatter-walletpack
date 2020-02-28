@@ -1,12 +1,20 @@
 'use strict';
-import { assert, expect } from 'chai';
+import Account from '../../core/lib/models/Account';
+import { Blockchains } from '../../core/lib/models/Blockchains';
+import EventService from '../../core/lib/services/utility/EventService';
+import KeyPairService from '../../core/lib/services/secure/KeyPairService';
+import PluginRepository from '../../core/lib/plugins/PluginRepository';
+import SigningService from '../../core/lib/services/secure/SigningService';
+import StoreService from '../../core/lib/services/utility/StoreService';
+
+import { assert } from 'chai';
 import PPYKeypairService from '../lib/PPYKeypairService';
+import _PPY from '../lib/_PPY';
 import { Login } from 'peerplaysjs-lib';
 
 require('isomorphic-fetch');
 
 const peerplays = new (require('../lib/peerplays').default)();
-const _PPY = require('../lib/_PPY').default;
 const RandomString = require('randomstring');
 
 // Mainnet testing account
@@ -16,14 +24,14 @@ const mainnetTester = {
   wifs: {
     owner: '5Hqz4M2KoEfhDML1ty8zhvpvVWqntdAXk86sDrEZBUFaVYYG5T8',
     active: '5KeU4uAV8YT4kZazX4hqakdsPck2L22dZYCHxMFkZL5TsRYex6j',
-    memo: '5J7uqJ9TkpJi6ssnbYtqpbdEJXhp2z5KAibuyZg3LUekYJtoeUx'
+    memo: '5J7uqJ9TkpJi6ssnbYtqpbdEJXhp2z5KAibuyZg3LUekYJtoeUx',
   },
   pubKeys: {
     owner: 'PPY4yaEWqYHxR8QxrFFFpVwYSgzNaMUVmiNgCwM31WPbjNPDUrKqn',
     active: 'PPY8QGhjBytYZrHpmDorLM4ETsoDYXGbGH3WT8sTrhu3LUJQ9ePf5',
-    memo: 'PPY64uMTGiYZQkn5P7dy87fnfVz68b4HYEBRTK1bc3wqEVTcp2GtB'
+    memo: 'PPY64uMTGiYZQkn5P7dy87fnfVz68b4HYEBRTK1bc3wqEVTcp2GtB',
   },
-  prefix: 'PPY'
+  prefix: 'PPY',
 };
 
 const charlieTester = {
@@ -32,14 +40,14 @@ const charlieTester = {
   wifs: {
     owner: '5KYZrFyX3YTMjBYJTrbQcs7DSPvFTa4JqdebpoGckP4SarptipG',
     active: '5JDuvHrcj66Ts5af1NLH3XbdTqepTwbNCJYuLyh1j2QGMztArsS',
-    memo: '5KQwCkL561FYfED6LiA6Z3NCvKdAPWPX1AbYVSEPsD3yANTnFjx'
+    memo: '5KQwCkL561FYfED6LiA6Z3NCvKdAPWPX1AbYVSEPsD3yANTnFjx',
   },
   pubKeys: {
     owner: 'TEST8ThZBscv57ZZtxnDndkkv6gfnbJ8ybabU4YxwfjFMoxSoXwoYA',
     active: 'TEST5cygheeaKf7PodjGcJRXbn4wWhKAYyi7uyVe6uaMtEL4CawKpv',
-    memo: 'TEST5LTXoKUtawewrMaqEduF5gAQwbwSS6MbtEKdXYMTjekTq5m3JW'
+    memo: 'TEST5LTXoKUtawewrMaqEduF5gAQwbwSS6MbtEKdXYMTjekTq5m3JW',
   },
-  prefix: 'TEST'
+  prefix: 'TEST',
 };
 
 // If using a non mainnet account, provide account data above and change the assignment below.
@@ -52,37 +60,96 @@ const transactionTest = {
   amount: 1,
   memo: '',
   asset: '1.3.0',
-  token: peerplays.defaultToken()
-}
+  token: peerplays.defaultToken(),
+};
+
+const network = peerplays.getEndorsedNetwork();
+const KEYPAIR = PPYKeypairService.newKeypair(TESTING_ACCOUNT.wifs, TESTING_ACCOUNT.prefix);
+KEYPAIR.network = peerplays.getEndorsedNetwork;
+
+// Overriding signer to include private key getter.
+SigningService.init(async (network, publicKey, payload, arbitrary = false, isHash = false) => {
+  return peerplays.signer(
+    payload,
+    TESTING_ACCOUNT.pubKeys.active,
+    arbitrary,
+    isHash,
+    KEYPAIR.privateKey
+  );
+});
+
+// Catching popout events
+EventService.init(async (type, data) => {
+  // console.log('event', type, data);
+  console.log('messages', data.payload.messages);
+  return { result: { accepted: true } };
+});
+
+// Overriding plugin repo
+PluginRepository.plugin = () => peerplays;
+
+// Loading fake identity (for signerWithPopup)
+// StoreService.get().state.scatter.keychain.identities[0].publicKey
+StoreService.init({
+  state: {
+    scatter: {
+      keychain: {
+        identities: [
+          {
+            publicKey: TESTING_ACCOUNT.pubKeys.active,
+          },
+        ],
+      },
+    },
+  },
+});
+
+// Turning off hardware checking (relies on StoreService)
+KeyPairService.isHardware = () => false;
 
 // Used for tests requiring a Scatter account object
 const dummyAccount = {
-  keypairUnique:'thing',
-  networkUnique:'ppy:chain:1',
+  keypairUnique: 'thing',
+  networkUnique: 'ppy:chain:1',
   publicKey: TESTING_ACCOUNT.pubKeys.active,
   name: TESTING_ACCOUNT.username,
   authority: 'active',
   fromOrigin: null,
-}
+  network: () => network,
+};
 
 // Used for tests requiring public and private keys
 const testingKeys = {
   pubActive: TESTING_ACCOUNT.pubKeys.active,
-  privActive: TESTING_ACCOUNT.wifs.active
-}
+  privActive: TESTING_ACCOUNT.wifs.active,
+  pubMemo: TESTING_ACCOUNT.pubKeys.memo,
+  privMemo: TESTING_ACCOUNT.wifs.memo,
+};
 
 describe('peerplays', () => {
-  it('should convert a private key WIF to it\'s public key (privateToPublic)', async () => {
-    const [wif, prefix, publicKey] = [TESTING_ACCOUNT.wifs.active, TESTING_ACCOUNT.prefix, TESTING_ACCOUNT.pubKeys.active]
-    assert(peerplays.privateToPublic(wif, prefix) === publicKey, 'Bad public key');
-  })
+  it.only('wif memo => public memo key', async () => {
+    const wif = '5KQwCkL561FYfED6LiA6Z3NCvKdAPWPX1AbYVSEPsD3yANTnFjx';
+    console.log(_PPY.privateFromWif(wif).toPublicKey().toPublicKeyString('TEST'));
+  });
 
-  it('should convert a private key WIF to it\'s PrivateKey counterpart (privateFromWif)', async () => {
+  it("should convert a private key WIF to it's public key (privateToPublic)", async () => {
+    const [wif, prefix, publicKey] = [
+      TESTING_ACCOUNT.wifs.active,
+      TESTING_ACCOUNT.prefix,
+      TESTING_ACCOUNT.pubKeys.active,
+    ];
+    assert(peerplays.privateToPublic(wif, prefix) === publicKey, 'Bad public key');
+  });
+
+  it("should convert a private key WIF to it's PrivateKey counterpart (privateFromWif)", async () => {
     const ppy = peerplays;
     const wif = TESTING_ACCOUNT.wifs.active;
     const pk = _PPY.privateFromWif(wif);
-    assert(ppy.privateToPublic(ppy.wifFromPrivate(pk), TESTING_ACCOUNT.prefix) === TESTING_ACCOUNT.pubKeys.active);
-  })
+    assert(
+      ppy.privateToPublic(ppy.wifFromPrivate(pk), TESTING_ACCOUNT.prefix) ===
+        TESTING_ACCOUNT.pubKeys.active
+    );
+  });
 
   it('should be able to retrieve a Peerplays accounts keys', async () => {
     const username = 'init1';
@@ -118,77 +185,68 @@ describe('peerplays', () => {
     assert.typeOf(response, 'object');
   });
 
-  it('should successfully build a transfer transaction object WITHOUT a memo', async () => {
-    const {from, to, token, memo, asset} = transactionTest;
-    let {amount} = transactionTest;
-    amount = _PPY.convertToChainAmount(amount, token);
-
-    // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
-    const tr = await _PPY.getTransferTransaction(from, to, amount, memo ? memo : '', asset);
-    assert(tr.operations[0][1].fee.amount > 0);
-  });
-
-  it('should successfully build a transfer transaction object WITH a memo', async () => {
-    const {from, to, token, asset} = transactionTest;
-    let {amount} = transactionTest;
+  it('should be able to sign (signer)', async () => {
+    const { from, to, token, asset } = transactionTest;
+    let { amount } = transactionTest;
     const memo = 'test memo';
     amount = _PPY.convertToChainAmount(amount, token);
-
-    // console.log(`Testing transfer transaction build with: \nfrom: ${from} \nto: ${to} \namount: ${amount} \nmemo: ${memo} \nasset: ${asset}`);
     let tr = await _PPY.getTransferTransaction(from, to, amount, memo, asset);
-    assert(tr.operations[0][1].fee.amount > 0);
-  });
 
-  it('should successfully sign a transaction (signer)', async () => {
-    const {from, to, token, asset} = transactionTest;
-    let {amount} = transactionTest;
-    const memo = 'test memo';
-    amount = _PPY.convertToChainAmount(amount, token);
-
-    let tr = await _PPY.getTransferTransaction(from, to, amount, memo, asset);
-    tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, _PPY.privateFromWif(TESTING_ACCOUNT.wifs.active));
-
+    // Build payload
+    let payload = {};
+    payload.transaction = tr;
+    tr = await peerplays.signer(
+      payload,
+      TESTING_ACCOUNT.pubKeys.active,
+      true,
+      true,
+      KEYPAIR.privateKey
+    );
     assert(tr.signer_private_keys.length > 0);
   });
 
-  it('should successfully finalize a signed transaction (finalize)', async () => {
-    const {from, to, token, asset} = transactionTest;
-    let {amount} = transactionTest;
-    const memo = 'test memo';
-    amount = _PPY.convertToChainAmount(amount, token);
+  it('should be able to transfer a balance WITHOUT & WITH a memo', async () => {
+    const token = peerplays.defaultToken();
+    token.amount = 1;
 
-    let tr = await _PPY.getTransferTransaction(from, to, amount, memo, asset);
-    tr = await peerplays.signer(tr, TESTING_ACCOUNT.pubKeys.active, false, false, _PPY.privateFromWif(TESTING_ACCOUNT.wifs.active));
-    await _PPY.finalize(tr);
-
-    // no errors, test passes
-  })
-
-  it('should successfully broadcast a signed transaction WITHOUT a memo(transfer)', async () => {
-    const {to, token, amount, memo} = transactionTest;
-    token.amount = amount;
-
-    return peerplays.transfer({account: dummyAccount, to, amount, memo, token}, testingKeys).then(res => {
-      console.log(res);
-    }).catch(err => {
-      console.error(err);
+    const account = Account.fromJson({
+      name: TESTING_ACCOUNT.username,
+      authority: 'active',
+      publicKey: TESTING_ACCOUNT.pubKeys.active,
     });
+
+    // OVERRIDING NETWORK GETTER
+    account.blockchain = () => Blockchains.PPY;
+    account.network = () => network;
+    account.keypair = () => KEYPAIR;
+
+    const transferredNoMemo = await peerplays.transfer({
+      account,
+      to: transactionTest.to,
+      amount: 1,
+      token
+    });
+
+    assert(!transferredNoMemo.message);
+
+    const transferredWithMemo = await peerplays.transfer({
+      account,
+      to: transactionTest.to,
+      amount: 1,
+      memo: 'test memo',
+      token
+    });
+
+    assert(!transferredWithMemo.message);
   });
 
-  it('should successfully broadcast a signed transaction WITH a memo(transfer)', async () => {
-    const {to, token, amount} = transactionTest;
-    const memo = 'test memo';
-    token.amount = amount;
-
-    return peerplays.transfer({account: dummyAccount, to, amount, memo, token}, testingKeys).then(res => {
-      console.log(res);
-    }).catch(err => {
-      console.error(err);
-    });
-  });
-
-  it('should generate a Keypair instance successfully with a decryptable "master" private key', async () => {
-    const {privKeys} = Login.generateKeys(TESTING_ACCOUNT.username, TESTING_ACCOUNT.password, ['owner', 'active', 'memo'], TESTING_ACCOUNT.prefix);
+  it('should generate a Keypair instance successfully with a decodable "master" private key', async () => {
+    const { privKeys } = Login.generateKeys(
+      TESTING_ACCOUNT.username,
+      TESTING_ACCOUNT.password,
+      ['owner', 'active', 'memo'],
+      TESTING_ACCOUNT.prefix
+    );
     const wifs = {};
 
     // Generate WIF for each private key (3 for each authority level).
@@ -199,10 +257,10 @@ describe('peerplays', () => {
     // You can assign other keypair instances to the returned keypair as it is an instance of Scatter KeyPair
     // ie: keypair.blockchains = ['ppy']
     const keypair = PPYKeypairService.newKeypair(wifs, TESTING_ACCOUNT.prefix);
-    const decryptedWifs = PPYKeypairService.getWifs(keypair);
+    const decryptedWifs = PPYKeypairService.getWifs(keypair.privateKey);
 
-    assert(decryptedWifs.owner === TESTING_ACCOUNT.wifs.owner, 'owner key wif decrypt mismatch')
-    assert(decryptedWifs.active === TESTING_ACCOUNT.wifs.active, 'active key wif decrypt mismatch')
-    assert(decryptedWifs.memo === TESTING_ACCOUNT.wifs.memo, 'memo key wif decrypt mismatch')
-  })
+    assert(decryptedWifs.owner === TESTING_ACCOUNT.wifs.owner, 'owner key wif decrypt mismatch');
+    assert(decryptedWifs.active === TESTING_ACCOUNT.wifs.active, 'active key wif decrypt mismatch');
+    assert(decryptedWifs.memo === TESTING_ACCOUNT.wifs.memo, 'memo key wif decrypt mismatch');
+  });
 });
