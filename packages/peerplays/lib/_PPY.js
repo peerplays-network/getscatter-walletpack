@@ -165,7 +165,12 @@ export default class _PPY {
       throw new Error('getFullAccount: Missing input');
     }
     const res = await this.callChain(methods.GET_FULL_ACCOUNTS, [[accountNameOrId], true]);
-    return res[0][1].account;
+    if (res.length === 0) {
+      console.error('Account does not exist');
+      return null;
+    } else {
+      return res[0][1].account;
+    }
   }
 
   /**
@@ -324,6 +329,10 @@ export default class _PPY {
   static async getAccountKeys(accountNameOrId) {
     const keys = {};
     const account = await this.getFullAccount(accountNameOrId);
+
+    if (!account) {
+      return null;
+    }
     ROLES.forEach(role => {
       let key;
 
@@ -354,6 +363,9 @@ export default class _PPY {
     Login.setRoles(ROLES);
 
     const userPubKeys = await this.getAccountKeys(username);
+    if (!userPubKeys) {
+      return null;
+    }
 
     const user = {
       accountName: username,
@@ -700,10 +712,10 @@ export default class _PPY {
 
         throw new Error(
           `${message}\n` +
-            'peerplays-crypto ' +
-            ` digest ${hash
-              .sha256(tr.tr_buffer)
-              .toString('hex')} transaction ${tr.tr_buffer.toString('hex')} ${JSON.stringify(
+          'peerplays-crypto ' +
+          ` digest ${hash
+            .sha256(tr.tr_buffer)
+            .toString('hex')} transaction ${tr.tr_buffer.toString('hex')} ${JSON.stringify(
               tr_object
             )}`
         );

@@ -184,7 +184,7 @@ export default class KeyPairService {
 		return keypair.external !== null;
     }
     
-    static generatePPYKeys(user, pass) {
+    static async generatePPYKeys(user, pass) {
         const plugin = PluginRepository.plugin('ppy');
         const keys = plugin.generateKeys(user, pass);
         return keys;
