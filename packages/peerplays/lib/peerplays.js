@@ -112,6 +112,14 @@ export default class PPY extends Plugin {
     return await _PPY.getChainId();
   }
 
+  async authUser(accountName, password) {
+    const auth = _PPY.authUser(accountName, password);
+    if (!auth) {
+      return null;
+    }
+    return auth;
+  }
+
   usesResources() {
     return false;
   }
