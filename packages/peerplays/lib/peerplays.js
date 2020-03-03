@@ -9,8 +9,8 @@ import Account from '@walletpack/core/models/Account';
 import HardwareService from '@walletpack/core/services/secure/HardwareService';
 import StoreService from '@walletpack/core/services/utility/StoreService';
 import EventService from '@walletpack/core/services/utility/EventService';
-import SigningService from '@walletpack/core/services/secure/SigningService';
-// import SigningService from '../../core/lib/services/secure/SigningService';
+// import SigningService from '@walletpack/core/services/secure/SigningService';
+import SigningService from '../../core/lib/services/secure/SigningService'; // uncomment if running into issues with transfer unit test
 import BigNumber from 'bignumber.js';
 const fetch = require('node-fetch');
 
@@ -18,7 +18,6 @@ import { ChainValidation, Login, PublicKey, PrivateKey as Pkey } from 'peerplays
 import _PPY from './_PPY';
 import PPYKeypairService from './PPYKeypairService';
 
-//TO-DO: Replace with Peerplays explorer.
 const EXPLORER = {
   name: 'PeerplaysBlockchain',
   account: 'https://peerplaysblockchain.info/account/{x}',
@@ -27,6 +26,7 @@ const EXPLORER = {
 };
 
 const MAINNET_CHAIN_ID = '6b6b5f0ce7a36d323768e534f3edb41c6d6332a541a95725b98e28d140850134';
+const USE_TESTNET = 1;
 let cachedInstances;
 
 export default class PPY extends Plugin {
@@ -63,18 +63,17 @@ export default class PPY extends Plugin {
     return Promise.race([
       new Promise(resolve => setTimeout(() => resolve(null), 2000)),
       _PPY
-        .getChainId()
-        .then(() => true)
+        .getChainId(network.host)
+        .then(() => {this.host = network.host; return true})
         .catch(() => false),
     ]);
   }
 
   getEndorsedNetwork() {
-    //TO-DO: Replace with Peerplays mainnet.
     return new Network(
       'Peerplays Mainnet',
       'https',
-      'seed01.eifos.org',
+      'api.eifos.org',
       7777,
       Blockchains.PPY,
       MAINNET_CHAIN_ID
@@ -232,7 +231,7 @@ export default class PPY extends Plugin {
    * Returns an array of Token class.
    */
   async balancesFor(account, tokens, fallback = false) {
-    let fullAccount = await _PPY.getFullAccountObject(account.name);
+    let fullAccount = await _PPY.getFullAccountObject(account.name, account.network().host);
     let unformattedBalance;
     let tokenArray = [];
     let assetId = '1.3.0';
@@ -268,7 +267,7 @@ export default class PPY extends Plugin {
    * Returns a Token class where `token.amount` is the balance.
    */
   async balanceFor(account, token) {
-    let fullAccount = await _PPY.getFullAccountObject(account.name);
+    let fullAccount = await _PPY.getFullAccountObject(account.name, account.network().host);
     let unformattedBalance;
     let assetId = '1.3.0';
 
@@ -381,15 +380,15 @@ export default class PPY extends Plugin {
    * Perform transfer
    *
    * @param {{account: Object, to: String, amount: Number, memo: String, token: String, promptForSignature: Boolean}}
-   * @param {{pubActive: string, pubMemo: string, privActive: string, privMemo: string}} testingKeys - If called via unit test, provide this.
    * @returns {Promise} resolve/reject - Resolve with transaction id if their is one. Reject with error if there is one.
    * @memberof PPY
    */
-  async transfer({ account, to, amount, memo, token, promptForSignature = false }, testingKeys) {
+  async transfer({ account, to, amount, memo, token, promptForSignature = false }) {
     if (!account || !to || !amount || !token) {
       throw new Error('transfer: Missing inputs');
     }
 
+    const host = account.network().host; //
     const from = account.name;
     const publicActiveKey = account.publicKey;
     amount = _PPY.convertToChainAmount(amount, token);
@@ -400,7 +399,8 @@ export default class PPY extends Plugin {
       to,
       amount,
       memo,
-      '1.3.0'
+      '1.3.0',
+      host
     );
 
     // Build payload
@@ -411,24 +411,11 @@ export default class PPY extends Plugin {
     if (promptForSignature) {
       transferTransaction = await this.signerWithPopup(transferTransaction, account, finished);
     } else {
-      // For testing
-      if (testingKeys) {
-        const { pubActive, privActive } = testingKeys;
-
-        transferTransaction = await this.signer(
-          payload,
-          pubActive,
-          false,
-          false,
-          privActive
-        );
-      }
-
       // SIGN
       transferTransaction = await SigningService.sign(account.network(), payload, publicActiveKey);
 
       // FINALIZE
-      transferTransaction = await _PPY.finalize(transferTransaction);
+      transferTransaction = await _PPY.finalize(transferTransaction, host);
 
       const callback = () => {
         console.info('callback executing after broadcast');
@@ -437,7 +424,7 @@ export default class PPY extends Plugin {
       // BROADCAST
       return new Promise((resolve, reject) => {
         _PPY
-          .broadcast(transferTransaction, callback)
+          .broadcast(transferTransaction, callback, host)
           .then(() => {
             resolve(transferTransaction.tr_buffer.toString('hex'));
           })

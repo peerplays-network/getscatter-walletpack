@@ -127,7 +127,7 @@ const testingKeys = {
 };
 
 describe('peerplays', () => {
-  it.only('wif memo => public memo key', async () => {
+  it('wif memo => public memo key', async () => {
     const wif = '5KQwCkL561FYfED6LiA6Z3NCvKdAPWPX1AbYVSEPsD3yANTnFjx';
     console.log(_PPY.privateFromWif(wif).toPublicKey().toPublicKeyString('TEST'));
   });

@@ -69,7 +69,7 @@ export default class Keypair {
         if (this.name.includes('Peerplays')) {
             return this.privateKey.includes('iv');
         }
-        return typeof this.privateKey === 'string' && this.privateKey.length > 100;
+        return typeof this.privateKey === 'string' && this.privateKey.indexOf('PPY') < 0 && this.privateKey.length > 100;
     }
 
     /***

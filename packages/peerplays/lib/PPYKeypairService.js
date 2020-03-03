@@ -33,7 +33,7 @@ export default class PPYKeypairService {
     const privActive = getPublicKeyString(wifs.active, prefix);
 
     // Encode they WIF keys and treat the result as a "master" key that other keys can be derived from.
-    keypair.privateKey = Buffer.from(JSON.stringify(wifs)).toString('ucs2')
+    keypair.privateKey = `PPY${Buffer.from(JSON.stringify(wifs)).toString('hex')}`
     keypair.blockchains = [blockchain];
     
     // Here we are storing the secret which doubles as the decrypt seed later for the Scatter UI.
@@ -53,7 +53,7 @@ export default class PPYKeypairService {
    * @memberof PPYKeypairService
    */
   static getWifs(encoded) {
-    const wifs = JSON.parse(Buffer.from(encoded, 'ucs2').toString())
+    const wifs = JSON.parse(Buffer.from(encoded.replace('PPY',''), 'hex').toString())
 
     if (!wifs.owner || !wifs.active || !wifs.memo) {
       throw new Error('getWifs: Invalid encoded data provided')

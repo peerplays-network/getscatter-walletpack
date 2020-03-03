@@ -163,7 +163,7 @@ export default class Identity {
     }
 
     clone(){ return Identity.fromJson(JSON.parse(JSON.stringify(this))) }
-    isEncrypted(){ return this.privateKey.length > 70 }
+    isEncrypted(){ return this.privateKey.indexOf('PPY') < 0 && this.privateKey.length > 70 }
     encrypt(seed){ if(!this.isEncrypted()) this.privateKey = AES.encrypt(this.privateKey, seed); }
     decrypt(seed){ if(this.isEncrypted()) this.privateKey = AES.decrypt(this.privateKey, seed); }
     defaultLocation(){ return this.getLocation() || StoreService.get().state.scatter.keychain.locations[0]; }

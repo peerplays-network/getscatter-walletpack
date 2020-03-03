@@ -40,6 +40,11 @@ if (PREFIX !== DEFAULT_PREFIX) {
   ChainConfig.setPrefix(PREFIX);
 }
 
+const API = {
+  DATABASE: 'database',
+  NETWORK: 'network_broadcast'
+}
+
 export default class _PPY {
   /**
    * Convert a human readable token/asset amount into a blockchain number (no decimals)
@@ -60,15 +65,21 @@ export default class _PPY {
   }
 
   /**
-   * Fetch the Peerplays blockchain for data.
+   * Call the Peerplays blockchain for data.
    *
    * @static
    * @param {String} method - The method associated with the request to be made.
    * @param {Array} params - The parameters associated with the method.
-   * @returns {*} - The data from the request OR an error if there is one.
+   * @param {string} [api='database'] - Set the network of this class on whichever function call this one first.
+   * @param {*} [hostOverride=ENDPOINT] - If provided, host will be overridden.
+   * @returns
    * @memberof _PPY
    */
-  static async callChain(method, params, api = 'database') {
+  static async callChain(method, params, api = API.DATABASE, hostOverride = ENDPOINT) {
+    if (hostOverride) this.host = hostOverride;
+
+    let host = !this.network ? ENDPOINT : this.host; // no network, using fallback
+
     const fetchBody = JSON.stringify({
       method: 'call',
       params: [api, method, params],
@@ -76,7 +87,8 @@ export default class _PPY {
       id: 1,
     });
 
-    return await fetch(ENDPOINT, {
+    // console.log('HOST: ', host) // debug determine where requests are going
+    return await fetch(host, {
       body: fetchBody,
       method: 'POST',
       headers: {
@@ -145,11 +157,14 @@ export default class _PPY {
    * Request the chain id.
    *
    * @static
-   * @returns {String}
+   * @param {String} network - Optional
+   * @returns {string}
    * @memberof _PPY
    */
-  static async getChainId() {
-    return await this.callChain(methods.GET_CHAIN_ID, []);
+  static async getChainId(host) {
+    if (host) this.host = host;
+    const chainID = await this.callChain(methods.GET_CHAIN_ID, []);
+    return chainID;
   }
 
   /**
@@ -178,10 +193,12 @@ export default class _PPY {
    *
    * @static
    * @param {String} accountNameOrId - The Peerplays account username to request data for.
+   * @param {String} host - The host override URL.
    * @returns {Object}
    * @memberof _PPY
    */
-  static async getFullAccountObject(accountNameOrId) {
+  static async getFullAccountObject(accountNameOrId, host) {
+    if (host) this.host = host;
     if (!accountNameOrId) {
       throw new Error('getFullAccount: Missing input');
     }
@@ -238,10 +255,12 @@ export default class _PPY {
    * @static
    * @param {String} assetId
    * @param {Object} tr - The instance of TransactionBuilder associated with the transaction requiring fees to be set.
+   * @param {String} host - The host override URL.
    * @returns {Object} - The transaction that was passed in with the fees set on the operations within it.
    * @memberof _PPY
    */
-  static async setRequiredFees(assetId, tr) {
+  static async setRequiredFees(assetId, tr, host) {
+    if (host) this.host = host;
     if (!tr.operations) {
       throw new Error('setRequiredFees: transaction has no operations');
     }
@@ -451,9 +470,9 @@ export default class _PPY {
    * Build the required memo object for a Peeprlays transfer operation.
    *
    * @static
-   * @param {string} memo
-   * @param {string} memoWif
-   * @param {string} recipient
+   * @param {string} memo - Message being attached as a memo.
+   * @param {string} memoWif - WIF of the sender.
+   * @param {string} recipient - Who is receiving the memo.
    * @param {boolean} [encryptMemo=true]
    * @param {*} [optional_nonce=null]
    * @returns
@@ -513,10 +532,12 @@ export default class _PPY {
    * @param {Number} amount - The numerical amount of funds to send to the recipient.
    * @param {String} memo - The optional message to send along with the funds being transferred.
    * @param {String} asset - The Peerplays asset (User Issued Asset token) id associated with the transfer.
+   * @param {String} host - The host override URL.
    * @returns {TransactionBuilder} - A TransactionBuilder transaction instance with fees set on the transaction for a transfer operation.
    * @memberof _PPY
    */
-  static async getTransferTransaction(from, to, amount, memo, asset) {
+  static async getTransferTransaction(from, to, amount, memo, asset, host) {
+    if (host) this.host = host;
     let feeAssetId = asset;
     if (!from || !to || !amount || !asset) {
       throw new Error('transfer: Missing inputs');
@@ -573,10 +594,12 @@ export default class _PPY {
    *
    * @static
    * @param {Object} tr - TransactionBuilder instance.
+   * @param {String} host - The host override URL.
    * @returns {Object} - tr
    * @memberof _PPY
    */
-  static async finalize(tr) {
+  static async finalize(tr, host) {
+    if (host) this.host = host;
     if (tr.signer_private_keys.length < 1) {
       throw new Error('not signed');
     }
@@ -696,7 +719,7 @@ export default class _PPY {
 
     let tr_object = ops.signed_transaction.toObject(tr); // serialize
 
-    return this.callChain(methods.BROADCAST, [res => res, tr_object], 'network_broadcast')
+    return this.callChain(methods.BROADCAST, [res => res, tr_object], API.NETWORK)
       .then(data => {
         if (was_broadcast_callback) {
           was_broadcast_callback();
