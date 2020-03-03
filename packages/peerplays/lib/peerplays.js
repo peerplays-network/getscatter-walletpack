@@ -9,8 +9,8 @@ import Account from '@walletpack/core/models/Account';
 import HardwareService from '@walletpack/core/services/secure/HardwareService';
 import StoreService from '@walletpack/core/services/utility/StoreService';
 import EventService from '@walletpack/core/services/utility/EventService';
-// import SigningService from '@walletpack/core/services/secure/SigningService';
-import SigningService from '../../core/lib/services/secure/SigningService'; // uncomment if running into issues with transfer unit test
+import SigningService from '@walletpack/core/services/secure/SigningService';
+// import SigningService from '../../core/lib/services/secure/SigningService'; // uncomment if running into issues with transfer unit test
 import BigNumber from 'bignumber.js';
 const fetch = require('node-fetch');
 
