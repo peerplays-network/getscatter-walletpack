@@ -138,6 +138,10 @@ export default class PPY extends Plugin {
     return true;
   }
 
+  isAccountNameError(username) {
+    return ChainValidation.is_account_name_error(username);
+  }
+
   isValidRecipient(name) {
     return ChainValidation.is_account_name(name);
   }
