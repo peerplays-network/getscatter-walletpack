@@ -123,7 +123,6 @@ export default class PPY extends Plugin {
 
   async register(username, password) {
     const response = await _PPY.register(2, username, password);
-    console.log(response);
     return response;
   }
 
