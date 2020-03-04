@@ -120,6 +120,11 @@ export default class PPY extends Plugin {
     return auth;
   }
 
+  async register(username, password) {
+    const response = await _PPY.register(2, username, password);
+    return response;
+  }
+
   usesResources() {
     return false;
   }
