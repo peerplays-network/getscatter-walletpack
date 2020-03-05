@@ -103,6 +103,10 @@ export default class PPY extends Plugin {
     return PPYKeypairService.newKeypair(wifs, prefix);
   }
 
+  isAccountNameError(username) {
+    return ChainValidation.is_account_name_error(username);
+  }
+
   isEndorsedNetwork(network) {
     const endorsedNetwork = this.getEndorsedNetwork();
     return network.blockchain === 'ppy' && network.chainId === endorsedNetwork.chainId;
