@@ -156,12 +156,10 @@ export default class PPY extends Plugin {
   getImportableAccounts(keypair, network) {
     return new Promise((resolve, reject) => {
       if (!keypair.username) {
-        console.error('no username');
         return resolve([]);
       }
 
       if (!keypair.publicKeys) {
-        console.error('no publicKey');
         return resolve([]);
       }
 
