@@ -350,21 +350,30 @@ export default class PPY extends Plugin {
    * @memberof PPY
    */
   async signer(payload, pub, arbitrary = false, isHash = false, priv = null) {
+    console.log('priv at the start of signer', priv);
     if (!payload || !pub) {
       throw new Error('Signer: Missing inputs');
     }
-
+    
     let wifs, privActiveWif, privMemoWif, privActiveKey, tr;
 
-    tr = payload.transaction;
-
-    if (typeof priv === 'string') {
+    // NO_WALLET=1
+    if (!priv) {
+      console.log('NO_WALLET=1 path');
+      wifs = PPYKeypairService.getWifs(payload.privateKeyEncoded);
+      console.log(wifs);
+      privActiveWif = wifs.active;
+      privMemoWif = wifs.memo;
+    } else if (typeof priv === 'string') { // NO_WALLET=
       wifs = PPYKeypairService.getWifs(priv);
       privActiveWif = wifs.active;
       privMemoWif = wifs.memo;
 
       privActiveKey = _PPY.privateFromWif(privActiveWif);
     }
+
+
+    tr = payload.transaction;
 
     // BUILD MEMO
     const {recipient, message, op} = tr;
@@ -403,10 +412,12 @@ export default class PPY extends Plugin {
       throw new Error('transfer: Missing inputs');
     }
 
-    const host = account.network().host; //
+    const host = account.network().host;
+    console.log('host', host);
     const from = account.name;
     const publicActiveKey = account.publicKey;
     amount = _PPY.convertToChainAmount(amount, token);
+    console.log('amount', amount);
 
     // Get the transaction
     let transferTransaction = await _PPY.getTransferTransaction(
@@ -418,14 +429,29 @@ export default class PPY extends Plugin {
       host
     );
 
+    console.log('transferTransaction', transferTransaction);
+
+    // Get the private key and decode it
+    // This is NO_WALLET=1 specific
+    const privateKeyEncoded = await KeyPairService.publicToPrivate(publicActiveKey);
+    console.log('privateKeyEncoded', privateKeyEncoded);
+    const wifs = PPYKeypairService.getWifs(privateKeyEncoded)
+    console.log('wifs', wifs)
     // Build payload
     let payload = {};
     payload.transaction = transferTransaction;
+
+    // Add to payload if available
+    if (privateKeyEncoded) { 
+      console.log('privateKeyEncoded');
+      payload.privateKeyEncoded = privateKeyEncoded;
+    }
 
     // Sign the transaction
     if (promptForSignature) {
       transferTransaction = await this.signerWithPopup(transferTransaction, account, finished);
     } else {
+      console.log('not prompting for signature');
       // SIGN
       transferTransaction = await SigningService.sign(account.network(), payload, publicActiveKey);
 
