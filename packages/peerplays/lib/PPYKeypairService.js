@@ -17,8 +17,6 @@ export default class PPYKeypairService {
    * Generate a new Scatter KeyPair with a "master" key set as the KeyPair.privateKey.
    * The "master" key is an encoded dataset containing all WIFs for all authentication levels for a Peerplays account.
    *
-   * 'ucs2': 2-bytes, little endian encoded Unicode characters. It can encode only BMP(Basic Multilingual Plane, U+0000 - U+FFFF).
-   *
    * @static
    * @param {{owner: String, active: String, memo: String}} wifs - An object containing all Wallet Import Format (WIF) keys associated with a Peerplays acocunt.
    * @param {String} prefix - The chain prefix to use. Important for correct key generation.
@@ -44,8 +42,6 @@ export default class PPYKeypairService {
 
   /**
    * Decodes the KeyPair.privateKey returned from PPYKeyPairService.newKeypair(...) into the three authority Wallet Import Format (WIF) keys for a Peerplays account.
-   *
-   * 'ucs2': 2-bytes, little endian encoded Unicode characters. It can encode only BMP(Basic Multilingual Plane, U+0000 - U+FFFF).
    *
    * @static
    * @param {String} encoded - Encoded WIF keys object, the Keypair.privateKey.
