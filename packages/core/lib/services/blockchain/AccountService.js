@@ -23,8 +23,10 @@ export default class AccountService {
     }
 
     static async getAccountsFor(keypair, network){
-        const publicKey = keypair.publicKeys.find(x => x.blockchain === network.blockchain).key;
+        if(!keypair) return null;
+        let publicKey = keypair.publicKeys.find(x => x.blockchain === network.blockchain);
         if(!publicKey) return null;
+        publicKey = publicKey.key;
 
         let accounts = [];
 
